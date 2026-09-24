@@ -9,6 +9,26 @@ It is based on an Excel sheet ("Subscription Tracking.xlsx") that was kept by ha
 
 The interface is available in **Greek, English and German**, with a light/dark theme.
 
+## Screenshots
+
+_All screenshots use made-up demo data._
+
+**Subscriptions**
+
+![Subscriptions list](docs/screenshots/subscriptions.png)
+
+**Recurring payments** — loans, installments, bills, insurance (with installment counters and bills awaiting their real amount)
+
+![Recurring payments](docs/screenshots/recurring.png)
+
+**Statistics** — every chart has tabs for Total / Subscriptions / Recurring payments
+
+![Statistics](docs/screenshots/statistics.png)
+
+**Dark theme**
+
+![Statistics, dark theme](docs/screenshots/statistics-dark.png)
+
 ---
 
 ## 1. Requirements
