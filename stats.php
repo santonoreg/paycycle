@@ -216,6 +216,22 @@ const LBL = {
   annual: <?= json_encode(t('stats.dataset.annual'), JSON_UNESCAPED_UNICODE) ?>,
 };
 
+const SCOPE = <?= json_encode($scopeLabels, JSON_UNESCAPED_UNICODE) ?>;
+const FORECAST_TXT = LBL.forecast;
+// Χρώματα ανά είδος (συνδρομές / πάγιες πληρωμές) για τα στοιβαγμένα γραφήματα
+const KIND_COLOR = { subscription: cssVar('--chart-brand'), recurring: cssVar('--ok') };
+const faded = (hex) => hex + '88'; // ίδιο χρώμα με διαφάνεια = πρόβλεψη
+// Ευθυγραμμίζει τιμές μιας ετικέτας-λίστας σε άλλη λίστα ετικετών (έτη)
+const align = (labels, srcLabels, srcValues) => labels.map((l) => { const i = srcLabels.indexOf(l); return i < 0 ? 0 : srcValues[i]; });
+const stackedTooltip = {
+  mode: 'index', intersect: false,
+  callbacks: {
+    label: (ctx) => ctx.dataset.label + ': ' + euroFmt(ctx.parsed.y),
+    footer: (items) => items.length > 1 ? '= ' + euroFmt(items.reduce((s, i) => s + (i.parsed.y || 0), 0)) : ''
+  }
+};
+const plainTooltip = { mode: 'nearest', intersect: true, callbacks: { label: (ctx) => ctx.dataset.label + ': ' + euroFmt(ctx.parsed.y), footer: () => '' } };
+
 const hasData = (arr) => arr.some((v) => Number(v) > 0);
 const yScale = { y: { beginAtZero: true, ticks: { callback: (v) => euroFmt(v) } } };
 
@@ -226,7 +242,7 @@ function register(cardKey, canvasId, config, apply) {
   const chart = new Chart(document.getElementById(canvasId), config);
   const card = document.querySelector('[data-card="' + cardKey + '"]');
   cards[cardKey] = function (scope) {
-    const empty = apply(chart, DATA[scope]);
+    const empty = apply(chart, DATA[scope], scope);
     chart.update();
     card.querySelector('.chart-empty').classList.toggle('d-none', !empty);
   };
@@ -280,12 +296,30 @@ register('monthly', 'chartMonthly', {
       legend: { display: true, position: 'bottom', labels: { boxWidth: 12, padding: 12 } },
       tooltip: { callbacks: { label: (ctx) => ctx.dataset.label + ': ' + euroFmt(ctx.parsed.y) } }
     },
-    scales: { y: yScale.y, x: { ticks: { autoSkip: true, maxRotation: 60, minRotation: 45 } } }
+    scales: { y: { ...yScale.y }, x: { ticks: { autoSkip: true, maxRotation: 60, minRotation: 45 } } }
   }
-}, (chart, d) => {
+}, (chart, d, scope) => {
   chart.data.labels = d.timeline;
-  chart.data.datasets[0].data = d.actual;
-  chart.data.datasets[1].data = d.forecast;
+  const bar = (label, data, color) => ({ label, data, backgroundColor: color, borderRadius: 3, maxBarThickness: 26 });
+  const stacked = scope === 'all';
+  if (stacked) {
+    // Σύνολο: στοιβαγμένες μπάρες συνδρομές + πάγιες (πραγματικά έξοδα και πρόβλεψη)
+    const s = DATA.subscription, r = DATA.recurring;
+    chart.data.datasets = [
+      bar(SCOPE.subscription, s.actual, KIND_COLOR.subscription),
+      bar(SCOPE.recurring, r.actual, KIND_COLOR.recurring),
+      bar(SCOPE.subscription + ' – ' + FORECAST_TXT, s.forecast, faded(KIND_COLOR.subscription)),
+      bar(SCOPE.recurring + ' – ' + FORECAST_TXT, r.forecast, faded(KIND_COLOR.recurring)),
+    ];
+  } else {
+    chart.data.datasets = [
+      bar(LBL.actual, d.actual, cssVar('--chart-brand')),
+      bar(LBL.forecast, d.forecast, cssVar('--gold')),
+    ];
+  }
+  chart.options.scales.x.stacked = stacked;
+  chart.options.scales.y.stacked = stacked;
+  chart.options.plugins.tooltip = stacked ? stackedTooltip : plainTooltip;
   return !hasData(d.actual) && !hasData(d.forecast);
 });
 
@@ -294,12 +328,28 @@ register('yearly', 'chartYearly', {
   data: { labels: [], datasets: [{ label: LBL.spending, data: [], backgroundColor: cssVar('--gold'), borderRadius: 4, maxBarThickness: 46 }] },
   options: {
     responsive: true, maintainAspectRatio: false,
-    plugins: { legend: { display: false }, tooltip: { callbacks: { label: (ctx) => euroFmt(ctx.parsed.y) } } },
-    scales: yScale
+    plugins: { legend: { display: false }, tooltip: {} },
+    scales: { y: { beginAtZero: true, ticks: { callback: (v) => euroFmt(v) } }, x: {} }
   }
-}, (chart, d) => {
+}, (chart, d, scope) => {
   chart.data.labels = d.yearLabels;
-  chart.data.datasets[0].data = d.yearValues;
+  const stacked = scope === 'all';
+  if (stacked) {
+    const s = DATA.subscription, r = DATA.recurring;
+    const mk = (label, vals, color) => ({ label, data: vals, backgroundColor: color, borderRadius: 3, maxBarThickness: 46 });
+    chart.data.datasets = [
+      mk(SCOPE.subscription, align(d.yearLabels, s.yearLabels, s.yearValues), KIND_COLOR.subscription),
+      mk(SCOPE.recurring, align(d.yearLabels, r.yearLabels, r.yearValues), KIND_COLOR.recurring),
+    ];
+  } else {
+    chart.data.datasets = [{ label: LBL.spending, data: d.yearValues, backgroundColor: cssVar('--gold'), borderRadius: 4, maxBarThickness: 46 }];
+  }
+  chart.options.scales.x.stacked = stacked;
+  chart.options.scales.y.stacked = stacked;
+  chart.options.plugins.legend.display = stacked;
+  chart.options.plugins.legend.position = 'bottom';
+  chart.options.plugins.legend.labels = { boxWidth: 12, padding: 12 };
+  chart.options.plugins.tooltip = stacked ? stackedTooltip : plainTooltip;
   return !hasData(d.yearValues);
 });
 
