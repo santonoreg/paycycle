@@ -42,6 +42,17 @@ if ($setInstallments) {
     }
 }
 
+// Εκτίμηση ποσού (μεταβλητά ποσά): διορθώνει την τρέχουσα τιμή αναφοράς
+$estimate = null;
+if ($setInstallments && !empty($_POST['variable_amount']) && trim($_POST['estimate'] ?? '') !== '') {
+    $rawEstimate = str_replace(',', '.', trim($_POST['estimate']));
+    if (!is_numeric($rawEstimate) || (float) $rawEstimate < 0) {
+        $errors[] = t('err.invalid_cost');
+    } else {
+        $estimate = round((float) $rawEstimate, 2);
+    }
+}
+
 if ($errors) {
     flash('danger', implode(' ', $errors));
     header('Location: ../' . backPage());
@@ -60,6 +71,14 @@ $stmt->execute([$name, $category, $frequency, $paymentMethod, $startDate, $notes
 if ($setInstallments) {
     $variableAmount = !empty($_POST['variable_amount']) ? 1 : 0;
     $pdo->prepare('UPDATE subscriptions SET total_installments=?, variable_amount=? WHERE id=?')->execute([$installments, $variableAmount, $id]);
+    if ($variableAmount) {
+        if ($estimate !== null) {
+            // Ενημέρωσε την πιο πρόσφατη τιμή (η εκτίμηση) και ξαναϋπολόγισε τις εκκρεμείς εκτιμήσεις
+            $pdo->prepare('UPDATE subscription_prices SET cost = ? WHERE id = (SELECT id FROM subscription_prices WHERE subscription_id = ? ORDER BY effective_from DESC, id DESC LIMIT 1)')
+                ->execute([$estimate, $id]);
+        }
+        refreshEstimates($pdo, $id);
+    }
     if (!$variableAmount) {
         // Δεν είναι πια μεταβλητό ποσό: ό,τι ήταν εκτίμηση μένει ως έχει (επιβεβαιωμένο)
         $pdo->prepare('UPDATE subscription_payments SET is_estimate=0 WHERE subscription_id=?')->execute([$id]);

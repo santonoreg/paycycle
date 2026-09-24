@@ -238,4 +238,6 @@ return [
     'var.save_amount' => 'Rechnungsbetrag speichern',
     'msg.amount_saved' => 'Der Rechnungsbetrag wurde gespeichert.',
     'err.invalid_amount' => 'Ungültiger Betrag.',
+    'field.estimate' => 'Geschätzter Betrag (€)',
+    'field.estimate_help' => 'Wird für eine Rechnung verwendet, bis du den echten Betrag einträgst, und solange es noch keine bestätigten Rechnungen gibt. Beim Speichern werden die geschätzten Monate aktualisiert.',
 ];

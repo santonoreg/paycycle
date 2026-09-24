@@ -43,6 +43,8 @@ document.addEventListener('DOMContentLoaded', function () {
       setVal('edit-installments', d.installments);
       var editVariable = document.getElementById('edit-variable');
       if (editVariable) editVariable.checked = d.variable === '1';
+      setVal('edit-estimate', d.estimate);
+      syncEstimateVisibility();
       setVal('price-sub-id', d.id);
 
       // Read-only fields (not logged in)
@@ -138,6 +140,15 @@ document.addEventListener('DOMContentLoaded', function () {
       }
     });
   }
+
+  // Το πεδίο εκτίμησης φαίνεται μόνο όταν είναι τσεκαρισμένο το "Μεταβλητό ποσό"
+  function syncEstimateVisibility() {
+    var cb = document.getElementById('edit-variable');
+    var wrap = document.getElementById('edit-estimate-wrap');
+    if (cb && wrap) wrap.classList.toggle('d-none', !cb.checked);
+  }
+  var editVariableBox = document.getElementById('edit-variable');
+  if (editVariableBox) editVariableBox.addEventListener('change', syncEstimateVisibility);
 
   function escapeHtml(s) {
     return String(s).replace(/[&<>"']/g, function (c) {

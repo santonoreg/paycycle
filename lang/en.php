@@ -249,4 +249,6 @@ return [
     'var.save_amount' => 'Save bill amount',
     'msg.amount_saved' => 'The bill amount was saved.',
     'err.invalid_amount' => 'Invalid amount.',
+    'field.estimate' => 'Estimated amount (€)',
+    'field.estimate_help' => 'Used for a bill until you enter its real amount, and when there are no confirmed bills yet. Saving updates the estimated months.',
 ];

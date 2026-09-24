@@ -171,6 +171,13 @@ require __DIR__ . '/includes/header.php';
             'id' => (int) $p['id'], 'cost' => (float) $p['cost'], 'effective_from' => $p['effective_from'],
             'deletable' => $p['deletable'],
         ], $d['prices'])), ENT_QUOTES);
+        // Τρέχουσα (σταθερή) εκτίμηση = η πιο πρόσφατη τιμή που ισχύει σήμερα
+        $fixedEstimate = null;
+        foreach ($d['prices'] as $pr) {
+            if ($pr['effective_from'] <= $today || $fixedEstimate === null) {
+                $fixedEstimate = (float) $pr['cost'];
+            }
+        }
         $freezesJson = htmlspecialchars(json_encode($d['freezes']), ENT_QUOTES);
         $paymentsJson = htmlspecialchars(json_encode(array_map(fn($p) => [
             'amount' => (float) $p['amount'], 'payment_date' => $p['payment_date'], 'is_estimate' => (int) $p['is_estimate'],
@@ -217,6 +224,7 @@ require __DIR__ . '/includes/header.php';
                 data-payment-method="<?= htmlspecialchars($sub['payment_method'] ?? '') ?>"
                 data-start-date="<?= $sub['start_date'] ?>"
                 data-notes="<?= htmlspecialchars($sub['notes'] ?? '') ?>"
+                data-estimate="<?= $fixedEstimate !== null ? number_format($fixedEstimate, 2, '.', '') : '' ?>"
                 data-variable="<?= !empty($sub['variable_amount']) ? 1 : 0 ?>"
                 data-installments="<?= (int) ($sub['total_installments'] ?? 0) ?: '' ?>"
                 data-status="<?= $sub['status'] ?>"
@@ -430,6 +438,11 @@ require __DIR__ . '/includes/header.php';
                   <input class="form-check-input" type="checkbox" name="variable_amount" value="1" id="edit-variable">
                   <label class="form-check-label" for="edit-variable"><?= te('field.variable') ?></label>
                   <div class="form-text"><?= te('field.variable_help') ?></div>
+                </div>
+                <div class="mb-3" id="edit-estimate-wrap">
+                  <label class="form-label" for="edit-estimate"><?= te('field.estimate') ?></label>
+                  <input type="number" step="0.01" min="0" name="estimate" id="edit-estimate" class="form-control">
+                  <div class="form-text"><?= te('field.estimate_help') ?></div>
                 </div>
                 <?php endif; ?>
                 <div class="mb-3">
