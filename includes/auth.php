@@ -44,7 +44,7 @@ function setAdminPassword(string $password): void
 /** @return string|null μήνυμα σφάλματος, ή null αν ο νέος κωδικός είναι έγκυρος */
 function validateNewPassword(string $password, string $confirm): ?string
 {
-    if (mb_strlen($password) < MIN_PASSWORD_LENGTH) {
+    if ((function_exists('mb_strlen') ? mb_strlen($password) : strlen($password)) < MIN_PASSWORD_LENGTH) {
         return t('pw.too_short', ['n' => MIN_PASSWORD_LENGTH]);
     }
     if ($password !== $confirm) {
