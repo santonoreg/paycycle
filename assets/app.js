@@ -41,6 +41,8 @@ document.addEventListener('DOMContentLoaded', function () {
       setVal('edit-start-date', d.startDate);
       setVal('edit-notes', d.notes);
       setVal('edit-installments', d.installments);
+      var editVariable = document.getElementById('edit-variable');
+      if (editVariable) editVariable.checked = d.variable === '1';
       setVal('price-sub-id', d.id);
 
       // Read-only fields (not logged in)
@@ -65,9 +67,26 @@ document.addEventListener('DOMContentLoaded', function () {
         if (sortedPayments.length === 0) {
           paymentsList.innerHTML = '<div class="text-muted small">' + escapeHtml(I18N.js.no_payments) + '</div>';
         } else {
+          var payCsrf = document.querySelector('#editPriceForm [name="csrf_token"]');
+          var payBack = document.querySelector('#editPriceForm [name="back"]');
+          // Μεταβλητό ποσό + συνδεδεμένος διαχειριστής: κάθε γραμμή έχει πεδίο για το πραγματικό ποσό του λογαριασμού
+          var canEditAmounts = !!payCsrf && d.variable === '1';
           paymentsList.innerHTML = sortedPayments.map(function (p) {
-            return '<div class="entry"><strong class="num">' + fmtEuro(p.amount) + '</strong> ' +
-              '<span class="text-muted">' + fmtDate(p.payment_date) + '</span></div>';
+            var badge = p.is_estimate ? ' <span class="awaiting-badge"><i class="bi bi-hourglass-split"></i> ' + escapeHtml(I18N.js.awaiting_bill) + '</span>' : '';
+            if (canEditAmounts) {
+              return '<div class="entry"><form method="post" action="actions/confirm_payment.php" class="d-flex align-items-center gap-2 flex-wrap">' +
+                '<input type="hidden" name="csrf_token" value="' + escapeHtml(payCsrf.value) + '">' +
+                (payBack ? '<input type="hidden" name="back" value="' + escapeHtml(payBack.value) + '">' : '') +
+                '<input type="hidden" name="id" value="' + escapeHtml(d.id) + '">' +
+                '<input type="hidden" name="payment_date" value="' + escapeHtml(p.payment_date) + '">' +
+                '<span class="text-muted">' + fmtDate(p.payment_date) + '</span>' + badge +
+                '<span class="ms-auto d-flex gap-1"><input type="number" step="0.01" min="0" name="amount" value="' + Number(p.amount).toFixed(2) + '" required ' +
+                'class="form-control form-control-sm num' + (p.is_estimate ? ' estimate-input' : '') + '" style="width:110px">' +
+                '<button type="submit" class="btn btn-sm btn-outline-primary py-0 px-2" title="' + escapeHtml(I18N.js.save_amount) + '"><i class="bi bi-check-lg"></i></button></span>' +
+                '</form></div>';
+            }
+            return '<div class="entry"><strong class="num">' + (p.is_estimate ? '≈ ' : '') + fmtEuro(p.amount) + '</strong> ' +
+              '<span class="text-muted">' + fmtDate(p.payment_date) + '</span>' + badge + '</div>';
           }).join('');
         }
       }

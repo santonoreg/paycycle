@@ -238,4 +238,15 @@ return [
     'field.installments_help' => 'Leave empty if there is no fixed end. When the last installment date passes, the payment is marked as "Paid off".',
     'inst.remaining' => '{n} remaining',
     'err.invalid_installments' => 'Invalid number of installments.',
+    // Μεταβλητά ποσά
+    'field.variable' => 'Variable amount (bill)',
+    'field.variable_help' => 'For bills whose amount is unknown until issued (electricity, mobile...). Enter an estimate as the cost (0 is fine). Each period is recorded as an estimate — the average of your last 3 confirmed bills — until you enter the real amount in the Payments tab.',
+    'list.variable' => 'variable',
+    'var.badge' => 'awaiting bill',
+    'var.badge_hint' => 'Estimated amount — enter the real bill in the Payments tab',
+    'var.pending_short' => '{n} awaiting bill',
+    'var.pending_total' => 'Bills awaiting the real amount: {n}. Open the payment and enter it in the Payments tab.',
+    'var.save_amount' => 'Save bill amount',
+    'msg.amount_saved' => 'The bill amount was saved.',
+    'err.invalid_amount' => 'Invalid amount.',
 ];

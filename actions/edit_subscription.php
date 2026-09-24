@@ -58,7 +58,12 @@ $stmt = $pdo->prepare("UPDATE subscriptions SET name=?, category=?, frequency=?,
 $stmt->execute([$name, $category, $frequency, $paymentMethod, $startDate, $notes, $id]);
 
 if ($setInstallments) {
-    $pdo->prepare('UPDATE subscriptions SET total_installments=? WHERE id=?')->execute([$installments, $id]);
+    $variableAmount = !empty($_POST['variable_amount']) ? 1 : 0;
+    $pdo->prepare('UPDATE subscriptions SET total_installments=?, variable_amount=? WHERE id=?')->execute([$installments, $variableAmount, $id]);
+    if (!$variableAmount) {
+        // Δεν είναι πια μεταβλητό ποσό: ό,τι ήταν εκτίμηση μένει ως έχει (επιβεβαιωμένο)
+        $pdo->prepare('UPDATE subscription_payments SET is_estimate=0 WHERE subscription_id=?')->execute([$id]);
+    }
     // Αν άλλαξε το πλήθος δόσεων: ενημέρωσε την κατάσταση (Εξοφλήθη <-> Ενεργή)
     reconcileInstallmentStatus($pdo, $id);
 }
@@ -69,6 +74,10 @@ $rebuilt = false;
 if ($old && $old['status'] !== 'canceled' && ($old['frequency'] !== $frequency || $old['start_date'] !== $startDate)) {
     $pdo->beginTransaction();
     try {
+        // Μεταβλητά ποσά: κράτα τους επιβεβαιωμένους λογαριασμούς ώστε να μη χαθούν στον επανυπολογισμό
+        $keep = $pdo->prepare('SELECT payment_date, amount FROM subscription_payments WHERE subscription_id = ? AND is_estimate = 0 AND (SELECT variable_amount FROM subscriptions WHERE id = ?) = 1');
+        $keep->execute([$id, $id]);
+        $confirmedRows = $keep->fetchAll();
         $pdo->prepare('DELETE FROM subscription_payments WHERE subscription_id = ?')->execute([$id]);
         $pr = $pdo->prepare('SELECT cost, effective_from FROM subscription_prices WHERE subscription_id = ? ORDER BY effective_from ASC, id ASC');
         $pr->execute([$id]);
@@ -76,6 +85,13 @@ if ($old && $old['status'] !== 'canceled' && ($old['frequency'] !== $frequency |
         $fr->execute([$id]);
         $sub = ['id' => $id, 'start_date' => $startDate, 'frequency' => $frequency];
         syncSubscriptionLedger($pdo, $sub, $pr->fetchAll(), $fr->fetchAll(), date('Y-m-d'));
+        $restore = $pdo->prepare('UPDATE subscription_payments SET amount = ?, is_estimate = 0 WHERE subscription_id = ? AND payment_date = ?');
+        foreach ($confirmedRows as $c) {
+            $restore->execute([$c['amount'], $id, $c['payment_date']]);
+        }
+        if ($confirmedRows) {
+            refreshEstimates($pdo, $id);
+        }
         $pdo->commit();
         $rebuilt = true;
     } catch (Throwable $e) {

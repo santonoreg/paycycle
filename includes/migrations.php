@@ -50,6 +50,20 @@ function getMigrations(): array
                 $pdo->exec('CREATE INDEX IF NOT EXISTS idx_subscriptions_kind ON subscriptions(kind)');
             },
         ],
+        5 => [
+            'name' => 'variable amount bills (subscriptions.variable_amount, payments.is_estimate)',
+            'up'   => function (PDO $pdo): void {
+                $subCols = array_column($pdo->query('PRAGMA table_info(subscriptions)')->fetchAll(), 'name');
+                if (!in_array('variable_amount', $subCols, true)) {
+                    $pdo->exec('ALTER TABLE subscriptions ADD COLUMN variable_amount INTEGER NOT NULL DEFAULT 0 CHECK(variable_amount IN (0,1))');
+                }
+                $payCols = array_column($pdo->query('PRAGMA table_info(subscription_payments)')->fetchAll(), 'name');
+                if (!in_array('is_estimate', $payCols, true)) {
+                    // Οι υπάρχουσες πληρωμές θεωρούνται επιβεβαιωμένες (0).
+                    $pdo->exec('ALTER TABLE subscription_payments ADD COLUMN is_estimate INTEGER NOT NULL DEFAULT 0 CHECK(is_estimate IN (0,1))');
+                }
+            },
+        ],
         4 => [
             'name' => 'subscriptions.total_installments + status paid_off (table rebuild, data preserved)',
             'own_transaction' => true,

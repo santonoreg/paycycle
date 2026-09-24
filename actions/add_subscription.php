@@ -26,6 +26,7 @@ $kind = in_array($_POST['kind'] ?? '', KINDS, true) ? $_POST['kind'] : 'subscrip
 setKind($kind);
 // Πλήθος δόσεων: προαιρετικό, μόνο για επαναλαμβανόμενες πληρωμές
 $installments = null;
+$variableAmount = $kind === 'recurring' && !empty($_POST['variable_amount']) ? 1 : 0;
 
 $errors = [];
 if ($name === '') $errors[] = t('err.name_required');
@@ -52,8 +53,8 @@ $pdo = getDb();
 $today = date('Y-m-d');
 $pdo->beginTransaction();
 try {
-    $stmt = $pdo->prepare('INSERT INTO subscriptions (name, category, frequency, payment_method, start_date, status, notes, kind, total_installments) VALUES (?,?,?,?,?,?,?,?,?)');
-    $stmt->execute([$name, $category, $frequency, $paymentMethod, $startDate, $status, $notes, $kind, $installments]);
+    $stmt = $pdo->prepare('INSERT INTO subscriptions (name, category, frequency, payment_method, start_date, status, notes, kind, total_installments, variable_amount) VALUES (?,?,?,?,?,?,?,?,?,?)');
+    $stmt->execute([$name, $category, $frequency, $paymentMethod, $startDate, $status, $notes, $kind, $installments, $variableAmount]);
     $subId = $pdo->lastInsertId();
 
     $stmt2 = $pdo->prepare('INSERT INTO subscription_prices (subscription_id, cost, effective_from) VALUES (?,?,?)');

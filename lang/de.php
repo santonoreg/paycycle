@@ -227,4 +227,15 @@ return [
     'field.installments_help' => 'Leer lassen, wenn es kein festes Ende gibt. Nach dem Datum der letzten Rate wird die Zahlung als „Abbezahlt“ markiert.',
     'inst.remaining' => 'noch {n}',
     'err.invalid_installments' => 'Ungültige Anzahl der Raten.',
+    // Μεταβλητά ποσά
+    'field.variable' => 'Variabler Betrag (Rechnung)',
+    'field.variable_help' => 'Für Rechnungen, deren Betrag erst nach Ausstellung bekannt ist (Strom, Handy...). Gib eine Schätzung als Kosten an (0 ist in Ordnung). Jede Periode wird als Schätzung erfasst – der Durchschnitt deiner letzten 3 bestätigten Rechnungen – bis du im Tab Zahlungen den echten Betrag einträgst.',
+    'list.variable' => 'variabel',
+    'var.badge' => 'Rechnung ausstehend',
+    'var.badge_hint' => 'Geschätzter Betrag – trage die echte Rechnung im Tab Zahlungen ein',
+    'var.pending_short' => '{n} Rechnung ausstehend',
+    'var.pending_total' => 'Rechnungen, die auf den echten Betrag warten: {n}. Öffne die Zahlung und trage ihn im Tab Zahlungen ein.',
+    'var.save_amount' => 'Rechnungsbetrag speichern',
+    'msg.amount_saved' => 'Der Rechnungsbetrag wurde gespeichert.',
+    'err.invalid_amount' => 'Ungültiger Betrag.',
 ];

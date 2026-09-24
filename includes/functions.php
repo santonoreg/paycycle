@@ -113,6 +113,51 @@ function priceAtDate(array $prices, string $date): float
 }
 
 /**
+ * Εκτίμηση ποσού για πληρωμές με ΜΕΤΑΒΛΗΤΟ ποσό (λογαριασμοί ρεύματος, κινητού κ.λπ.):
+ * ο μέσος όρος των 3 τελευταίων ΕΠΙΒΕΒΑΙΩΜΕΝΩΝ λογαριασμών πριν από την
+ * ημερομηνία. Αν δεν υπάρχει κανένας, η τιμή (εκτίμηση) που έδωσε ο χρήστης.
+ * $payments: ['payment_date'=>..., 'amount'=>..., 'is_estimate'=>0|1]
+ */
+function estimateFromPayments(array $payments, array $prices, string $date): float
+{
+    $confirmed = [];
+    foreach ($payments as $p) {
+        if (empty($p['is_estimate']) && $p['payment_date'] < $date) {
+            $confirmed[] = $p;
+        }
+    }
+    usort($confirmed, fn($a, $b) => strcmp($b['payment_date'], $a['payment_date']));
+    $last = array_slice($confirmed, 0, 3);
+    if (empty($last)) {
+        return priceAtDate($prices, $date);
+    }
+    $sum = 0.0;
+    foreach ($last as $p) {
+        $sum += (float) $p['amount'];
+    }
+    return round($sum / count($last), 2);
+}
+
+/** Ξαναϋπολογίζει τα ποσά των πληρωμών που είναι ακόμα εκτιμήσεις (μετά από επιβεβαίωση λογαριασμού ή αλλαγή τιμής). */
+function refreshEstimates(PDO $pdo, int $subId): void
+{
+    $pricesStmt = $pdo->prepare('SELECT cost, effective_from FROM subscription_prices WHERE subscription_id = ? ORDER BY effective_from ASC, id ASC');
+    $pricesStmt->execute([$subId]);
+    $prices = $pricesStmt->fetchAll();
+
+    $payStmt = $pdo->prepare('SELECT id, payment_date, amount, is_estimate FROM subscription_payments WHERE subscription_id = ? ORDER BY payment_date ASC');
+    $payStmt->execute([$subId]);
+    $payments = $payStmt->fetchAll();
+
+    $upd = $pdo->prepare('UPDATE subscription_payments SET amount = ? WHERE id = ?');
+    foreach ($payments as $p) {
+        if (!empty($p['is_estimate'])) {
+            $upd->execute([estimateFromPayments($payments, $prices, $p['payment_date']), $p['id']]);
+        }
+    }
+}
+
+/**
  * True αν κάποια καταχωρημένη πληρωμή έχει υπολογιστεί με την τιμή στη θέση $index.
  * Μια τιμή καλύπτει τις πληρωμές από το effective_from της (συμπεριλαμβάνεται)
  * μέχρι το effective_from της επόμενης τιμής (δεν συμπεριλαμβάνεται).
@@ -191,9 +236,16 @@ function syncSubscriptionLedgerRows(PDO $pdo, array $sub, array $prices, array $
 {
     $frequency = $sub['frequency'];
 
-    $limitStmt = $pdo->prepare('SELECT total_installments, (SELECT COUNT(*) FROM subscription_payments WHERE subscription_id = subscriptions.id) FROM subscriptions WHERE id = ?');
+    $limitStmt = $pdo->prepare('SELECT total_installments, (SELECT COUNT(*) FROM subscription_payments WHERE subscription_id = subscriptions.id), variable_amount FROM subscriptions WHERE id = ?');
     $limitStmt->execute([$sub['id']]);
-    [$totalInstallments, $recorded] = $limitStmt->fetch(PDO::FETCH_NUM) ?: [null, 0];
+    [$totalInstallments, $recorded, $variableAmount] = $limitStmt->fetch(PDO::FETCH_NUM) ?: [null, 0, 0];
+    $variableAmount = (int) $variableAmount === 1;
+    $confirmedPayments = [];
+    if ($variableAmount) {
+        $cp = $pdo->prepare('SELECT payment_date, amount, is_estimate FROM subscription_payments WHERE subscription_id = ?');
+        $cp->execute([$sub['id']]);
+        $confirmedPayments = $cp->fetchAll();
+    }
     $totalInstallments = $totalInstallments !== null ? (int) $totalInstallments : null;
     $recorded = (int) $recorded;
     $interval = new DateInterval(frequencyIntervalSpec($frequency));
@@ -214,7 +266,7 @@ function syncSubscriptionLedgerRows(PDO $pdo, array $sub, array $prices, array $
         return 0;
     }
 
-    $ins = $pdo->prepare('INSERT OR IGNORE INTO subscription_payments (subscription_id, payment_date, amount) VALUES (?,?,?)');
+    $ins = $pdo->prepare('INSERT OR IGNORE INTO subscription_payments (subscription_id, payment_date, amount, is_estimate) VALUES (?,?,?,?)');
     $inserted = 0;
     $safety = 0;
     while ($cursor <= $end && $safety < 5000) {
@@ -223,7 +275,9 @@ function syncSubscriptionLedgerRows(PDO $pdo, array $sub, array $prices, array $
         }
         $d = $cursor->format('Y-m-d');
         if (!isFrozenAt($freezes, $d)) {
-            $ins->execute([$sub['id'], $d, priceAtDate($prices, $d)]);
+            // Μεταβλητό ποσό: εκτίμηση (μέσος όρος τελευταίων 3 λογαριασμών) μέχρι να επιβεβαιωθεί ο λογαριασμός
+            $amount = $variableAmount ? estimateFromPayments($confirmedPayments, $prices, $d) : priceAtDate($prices, $d);
+            $ins->execute([$sub['id'], $d, $amount, $variableAmount ? 1 : 0]);
             $inserted += $ins->rowCount();
         }
         $cursor->add($interval);
@@ -285,6 +339,13 @@ function computeSubscriptionStats(array $sub, array $prices, array $freezes, arr
     $nextPaymentDate = null;
     $nextPaymentAmount = null;
 
+    $variable = !empty($sub['variable_amount']);
+    $estimatesPending = 0;
+    foreach ($payments as $p) {
+        if (!empty($p['is_estimate'])) {
+            $estimatesPending++;
+        }
+    }
     $totalInstallments = isset($sub['total_installments']) && $sub['total_installments'] !== '' ? (int) $sub['total_installments'] : null;
     $allPaid = $totalInstallments !== null && $installmentsPaid >= $totalInstallments;
 
@@ -301,10 +362,10 @@ function computeSubscriptionStats(array $sub, array $prices, array $freezes, arr
             $safety++;
         }
         $nextPaymentDate = $cursor->format('Y-m-d');
-        $nextPaymentAmount = priceAtDate($prices, $nextPaymentDate);
+        $nextPaymentAmount = $variable ? estimateFromPayments($payments, $prices, $nextPaymentDate) : priceAtDate($prices, $nextPaymentDate);
     }
 
-    $currentPrice = priceAtDate($prices, $today);
+    $currentPrice = $variable ? estimateFromPayments($payments, $prices, $today) : priceAtDate($prices, $today);
     // Αν δεν υπάρχει ακόμα καμία εγγραφή τιμής με effective_from <= today
     // (π.χ. μελλοντική συνδρομή), πάρε την πρώτη γνωστή τιμή.
     if ($currentPrice === 0.0 && !empty($prices)) {
@@ -320,6 +381,8 @@ function computeSubscriptionStats(array $sub, array $prices, array $freezes, arr
         'next_payment_date'   => $nextPaymentDate,
         'next_payment_amount' => $nextPaymentAmount !== null ? round($nextPaymentAmount, 2) : null,
         'is_frozen_now'       => $sub['status'] === 'frozen',
+        'is_variable'            => $variable,
+        'estimates_pending'      => $estimatesPending,
         'installments_total'     => $totalInstallments,
         'installments_remaining' => $totalInstallments !== null ? max(0, $totalInstallments - $installmentsPaid) : null,
     ];
@@ -377,7 +440,7 @@ function getAllSubscriptionsWithDetails(PDO $pdo, ?string $today = null, ?string
 
     $pricesStmt = $pdo->prepare('SELECT id, cost, effective_from FROM subscription_prices WHERE subscription_id = ? ORDER BY effective_from ASC, id ASC');
     $freezesStmt = $pdo->prepare('SELECT frozen_from, frozen_until FROM subscription_freezes WHERE subscription_id = ? ORDER BY frozen_from ASC');
-    $paymentsStmt = $pdo->prepare('SELECT payment_date, amount FROM subscription_payments WHERE subscription_id = ? ORDER BY payment_date ASC');
+    $paymentsStmt = $pdo->prepare('SELECT payment_date, amount, is_estimate FROM subscription_payments WHERE subscription_id = ? ORDER BY payment_date ASC');
 
     $result = [];
     foreach ($subs as $sub) {

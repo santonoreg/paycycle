@@ -131,7 +131,9 @@ function computeForecastSpend(array $details, ?string $today = null): array
             if ($dateStr >= $forecastStartStr && $dateStr <= $forecastEndStr) {
                 $ym = substr($dateStr, 0, 7);
                 if (isset($buckets[$ym])) {
-                    $buckets[$ym] += priceAtDate($d['prices'], $dateStr);
+                    $buckets[$ym] += !empty($sub['variable_amount'])
+                        ? estimateFromPayments($d['payments'], $d['prices'], $dateStr)
+                        : priceAtDate($d['prices'], $dateStr);
                 }
             }
             $cursor->add($interval);

@@ -253,3 +253,12 @@ a { color: var(--brand); }
 
 /* ---- Κατάσταση "Εξοφλήθη" ------------------------------------------------- */
 .status-paid_off { background: var(--surface-2); color: var(--text-muted); border: 1px solid var(--border); }
+
+/* ---- Μεταβλητά ποσά (λογαριασμοί) ------------------------------------------- */
+.awaiting-badge {
+  display: inline-flex; align-items: center; gap: 0.3em;
+  font-size: 0.72rem; font-weight: 600; white-space: nowrap;
+  padding: 0.12em 0.55em; border-radius: 999px;
+  background: var(--gold-tint); color: var(--gold);
+}
+.estimate-input { font-style: italic; border-style: dashed; }

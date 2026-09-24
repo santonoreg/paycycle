@@ -29,6 +29,12 @@ foreach ($allDetails as $d) {
     }
 }
 $upcoming = computeUpcomingTotals($allDetails, $today);
+$pendingBills = 0;
+foreach ($allDetails as $d) {
+    if ($d['sub']['status'] !== 'canceled') {
+        $pendingBills += $d['stats']['estimates_pending'];
+    }
+}
 
 // --- Φίλτρα (GET) ------------------------------------------------------
 // Αν δεν έχει επιλεγεί φίλτρο (πρώτο άνοιγμα), ισχύει το προεπιλεγμένο από τις Ρυθμίσεις.
@@ -95,6 +101,10 @@ require __DIR__ . '/includes/header.php';
 <div class="text-muted small mt-2 mb-4">
   <?= te('idx.rest_of_month') ?>: <strong class="num"><?= euro($upcoming['rest_of_this_month']) ?></strong>
 </div>
+
+<?php if ($pendingBills > 0): ?>
+  <div class="alert alert-warning py-2 mb-3"><i class="bi bi-hourglass-split"></i> <?= te('var.pending_total', ['n' => $pendingBills]) ?></div>
+<?php endif; ?>
 
 <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
   <form class="d-flex flex-wrap gap-2" method="get">
@@ -163,7 +173,7 @@ require __DIR__ . '/includes/header.php';
         ], $d['prices'])), ENT_QUOTES);
         $freezesJson = htmlspecialchars(json_encode($d['freezes']), ENT_QUOTES);
         $paymentsJson = htmlspecialchars(json_encode(array_map(fn($p) => [
-            'amount' => (float) $p['amount'], 'payment_date' => $p['payment_date'],
+            'amount' => (float) $p['amount'], 'payment_date' => $p['payment_date'], 'is_estimate' => (int) $p['is_estimate'],
         ], $d['payments'])), ENT_QUOTES);
       ?>
         <tr class="<?= $rowClass ?>">
@@ -171,13 +181,13 @@ require __DIR__ . '/includes/header.php';
             <div class="sub-name"><?= htmlspecialchars($sub['name']) ?></div>
             <div class="sub-category"><?= htmlspecialchars($sub['category']) ?></div>
           </td>
-          <td class="num"><?= euro($stats['current_price']) ?><div class="sub-category"><?= te('freq.' . $sub['frequency']) ?></div></td>
+          <td class="num"><?= $stats['is_variable'] ? '≈ ' : '' ?><?= euro($stats['current_price']) ?><div class="sub-category"><?= te('freq.' . $sub['frequency']) ?><?= $stats['is_variable'] ? ' · ' . te('list.variable') : '' ?></div></td>
           <td class="num"><?= euro($stats['monthly_equivalent']) ?></td>
           <td><?= fdate($sub['start_date']) ?></td>
           <td class="num">
             <?php if ($stats['next_payment_date']): ?>
               <span class="<?= ($days !== null && $days <= 7) ? 'next-soon' : '' ?>"><?= fdate($stats['next_payment_date']) ?></span>
-              <div class="sub-category"><?= euro($stats['next_payment_amount']) ?></div>
+              <div class="sub-category"><?= $stats['is_variable'] ? '≈ ' : '' ?><?= euro($stats['next_payment_amount']) ?></div>
             <?php else: ?>
               <span class="text-muted">—</span>
             <?php endif; ?>
@@ -193,6 +203,9 @@ require __DIR__ . '/includes/header.php';
           <td class="text-end num"><?= euro($stats['total_paid']) ?></td>
           <td>
             <span class="status-badge status-<?= $sub['status'] ?>"><?= te('status.' . $sub['status']) ?></span>
+            <?php if ($stats['estimates_pending'] > 0 && $sub['status'] !== 'canceled'): ?>
+              <div><span class="awaiting-badge" title="<?= te('var.badge_hint') ?>"><i class="bi bi-hourglass-split"></i> <?= te('var.pending_short', ['n' => $stats['estimates_pending']]) ?></span></div>
+            <?php endif; ?>
           </td>
           <td class="text-end">
             <div class="d-flex gap-1 justify-content-end">
@@ -204,6 +217,7 @@ require __DIR__ . '/includes/header.php';
                 data-payment-method="<?= htmlspecialchars($sub['payment_method'] ?? '') ?>"
                 data-start-date="<?= $sub['start_date'] ?>"
                 data-notes="<?= htmlspecialchars($sub['notes'] ?? '') ?>"
+                data-variable="<?= !empty($sub['variable_amount']) ? 1 : 0 ?>"
                 data-installments="<?= (int) ($sub['total_installments'] ?? 0) ?: '' ?>"
                 data-status="<?= $sub['status'] ?>"
                 data-current-price="<?= $stats['current_price'] ?>"
@@ -328,6 +342,11 @@ require __DIR__ . '/includes/header.php';
             <input type="number" min="1" max="1200" step="1" name="installments" class="form-control" placeholder="<?= te('field.installments_ph') ?>">
             <div class="form-text"><?= te('field.installments_help') ?></div>
           </div>
+          <div class="form-check mb-3">
+            <input class="form-check-input" type="checkbox" name="variable_amount" value="1" id="add-variable">
+            <label class="form-check-label" for="add-variable"><?= te('field.variable') ?></label>
+            <div class="form-text"><?= te('field.variable_help') ?></div>
+          </div>
           <?php endif; ?>
           <div class="mb-1">
             <label class="form-label"><?= te('field.notes') ?></label>
@@ -406,6 +425,11 @@ require __DIR__ . '/includes/header.php';
                   <label class="form-label"><?= te('field.installments') ?></label>
                   <input type="number" min="1" max="1200" step="1" name="installments" id="edit-installments" class="form-control" placeholder="<?= te('field.installments_ph') ?>">
                   <div class="form-text"><?= te('field.installments_help') ?></div>
+                </div>
+                <div class="form-check mb-3">
+                  <input class="form-check-input" type="checkbox" name="variable_amount" value="1" id="edit-variable">
+                  <label class="form-check-label" for="edit-variable"><?= te('field.variable') ?></label>
+                  <div class="form-text"><?= te('field.variable_help') ?></div>
                 </div>
                 <?php endif; ?>
                 <div class="mb-3">

@@ -48,6 +48,15 @@ $pricesStmt = $pdo->prepare('SELECT cost, effective_from FROM subscription_price
 $pricesStmt->execute([$id]);
 $allPrices = $pricesStmt->fetchAll();
 
+$isVariable = (int) $pdo->query('SELECT variable_amount FROM subscriptions WHERE id = ' . (int) $id)->fetchColumn() === 1;
+if ($isVariable) {
+    // Μεταβλητό ποσό: η τιμή είναι μόνο εκτίμηση. Οι επιβεβαιωμένοι λογαριασμοί ΔΕΝ αλλάζουν.
+    refreshEstimates($pdo, $id);
+    flash('success', t('msg.price_added'));
+    header('Location: ../' . backPage());
+    exit;
+}
+
 $affected = $pdo->prepare('SELECT id, payment_date FROM subscription_payments WHERE subscription_id=? AND payment_date >= ?');
 $affected->execute([$id, $effectiveFrom]);
 $rows = $affected->fetchAll();
