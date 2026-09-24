@@ -1,0 +1,10 @@
+# Εμποδίζει την απευθείας πρόσβαση στο SQLite αρχείο (και σε ό,τι άλλο
+# μπει σε αυτόν τον φάκελο) μέσω browser. Λειτουργεί με Apache 2.4+.
+<IfModule mod_authz_core.c>
+    Require all denied
+</IfModule>
+<IfModule !mod_authz_core.c>
+    # Apache 2.2 και παλιότερα
+    Order deny,allow
+    Deny from all
+</IfModule>

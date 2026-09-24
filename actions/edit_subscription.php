@@ -1,0 +1,75 @@
+<?php
+require __DIR__ . '/../config.php';
+require __DIR__ . '/../includes/db.php';
+require __DIR__ . '/../includes/auth.php';
+require __DIR__ . '/../includes/functions.php';
+require __DIR__ . '/../includes/i18n.php';
+
+requireLogin();
+
+if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
+    header('Location: ../index.php');
+    exit;
+}
+verifyCsrf();
+
+$id = (int) ($_POST['id'] ?? 0);
+$name = trim($_POST['name'] ?? '');
+$category = trim($_POST['category'] ?? '');
+$frequency = $_POST['frequency'] ?? '';
+$paymentMethod = trim($_POST['payment_method'] ?? '') ?: null;
+$startDate = $_POST['start_date'] ?? '';
+$notes = trim($_POST['notes'] ?? '') ?: null;
+
+$errors = [];
+if ($id <= 0) $errors[] = t('err.unknown_sub');
+if ($name === '') $errors[] = t('err.name_required');
+if ($category === '') $errors[] = t('err.category_required');
+if (!in_array($frequency, FREQUENCY_KEYS, true)) $errors[] = t('err.invalid_frequency');
+if (!DateTime::createFromFormat('Y-m-d', $startDate)) $errors[] = t('err.invalid_start');
+
+if ($errors) {
+    flash('danger', implode(' ', $errors));
+    header('Location: ../index.php');
+    exit;
+}
+
+$pdo = getDb();
+$oldStmt = $pdo->prepare('SELECT * FROM subscriptions WHERE id = ?');
+$oldStmt->execute([$id]);
+$old = $oldStmt->fetch();
+
+$stmt = $pdo->prepare("UPDATE subscriptions SET name=?, category=?, frequency=?, payment_method=?, start_date=?, notes=?, updated_at=datetime('now') WHERE id=?");
+$stmt->execute([$name, $category, $frequency, $paymentMethod, $startDate, $notes, $id]);
+
+// Αν άλλαξε η συχνότητα ή η ημερομηνία έναρξης, οι καταχωρημένες πληρωμές
+// (που είχαν υπολογιστεί με το παλιό βήμα) δεν ισχύουν πια: ξαναχτίζονται.
+$rebuilt = false;
+if ($old && $old['status'] !== 'canceled' && ($old['frequency'] !== $frequency || $old['start_date'] !== $startDate)) {
+    $pdo->beginTransaction();
+    try {
+        $pdo->prepare('DELETE FROM subscription_payments WHERE subscription_id = ?')->execute([$id]);
+        $pr = $pdo->prepare('SELECT cost, effective_from FROM subscription_prices WHERE subscription_id = ? ORDER BY effective_from ASC, id ASC');
+        $pr->execute([$id]);
+        $fr = $pdo->prepare('SELECT frozen_from, frozen_until FROM subscription_freezes WHERE subscription_id = ? ORDER BY frozen_from ASC');
+        $fr->execute([$id]);
+        $sub = ['id' => $id, 'start_date' => $startDate, 'frequency' => $frequency];
+        syncSubscriptionLedger($pdo, $sub, $pr->fetchAll(), $fr->fetchAll(), date('Y-m-d'));
+        $pdo->commit();
+        $rebuilt = true;
+    } catch (Throwable $e) {
+        $pdo->rollBack();
+        flash('danger', t('msg.rebuild_error', ['error' => $e->getMessage()]));
+        header('Location: ../index.php');
+        exit;
+    }
+}
+
+if ($stmt->rowCount() === 0) {
+    flash('warning', t('msg.no_change'));
+} else {
+    flash('success', t('msg.info_updated') . ($rebuilt ? t('msg.info_rebuilt') : ''));
+}
+
+header('Location: ../index.php');
+exit;

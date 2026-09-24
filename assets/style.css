@@ -1,0 +1,229 @@
+/* ------------------------------------------------------------------------
+   Παρακολούθηση Συνδρομών — design tokens
+   Παλέτα: βαθύ ωκεάνιο μπλε (μάρκα) + θερμό χρυσό (τονισμός χρηματικών ποσών)
+   πάνω σε ψυχρό, πολύ ανοιχτό γκρι φόντο — αίσθηση "λογιστικού" dashboard.
+   ------------------------------------------------------------------------ */
+:root {
+  --bg:            #F6F7F9;
+  --surface:       #FFFFFF;
+  --surface-2:     #EEF1F5;
+  --border:        #E1E5EB;
+  --text:          #1E2A32;
+  --text-muted:    #64748B;
+
+  --brand:         #1B4B66;
+  --brand-dark:    #123449;
+  --brand-tint:    #E7EEF2;
+  --chart-brand:   #1B4B66;
+
+  --gold:          #B8842E;
+  --gold-tint:     #FBF2E2;
+
+  --ok:            #2F8F5B;
+  --ok-tint:       #E6F4ED;
+  --trial:         #3E7CB1;
+  --trial-tint:    #E8F1F8;
+  --frozen:        #4C8FBD;
+  --frozen-tint:   #EAF3FA;
+  --canceled:      #B0483C;
+  --canceled-tint: #F8EAE8;
+
+  --radius: 10px;
+  --shadow: 0 1px 2px rgba(20, 30, 40, 0.06), 0 1px 1px rgba(20, 30, 40, 0.04);
+}
+
+* { box-sizing: border-box; }
+
+html, body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  font-size: 15px;
+}
+
+h1, h2, h3, h4, h5 {
+  color: var(--brand-dark);
+  font-weight: 650;
+  letter-spacing: -0.01em;
+}
+
+a { color: var(--brand); }
+
+.num, .num * {
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: "tnum" 1;
+}
+
+/* ---- Navbar ------------------------------------------------------------ */
+.app-navbar {
+  background: linear-gradient(180deg, var(--brand-dark), var(--brand));
+  box-shadow: var(--shadow);
+}
+.app-navbar .nav-link { color: rgba(255,255,255,0.82); }
+.app-navbar .nav-link.active, .app-navbar .nav-link:hover { color: #fff; }
+
+/* ---- Cards / surfaces --------------------------------------------------- */
+.card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+}
+
+.stat-card {
+  border-left: 4px solid var(--brand);
+  border-radius: var(--radius);
+  background: var(--surface);
+  border-top: 1px solid var(--border);
+  border-right: 1px solid var(--border);
+  border-bottom: 1px solid var(--border);
+  padding: 1rem 1.2rem;
+  height: 100%;
+}
+.stat-card .label {
+  color: var(--text-muted);
+  font-size: 0.8rem;
+  text-transform: none;
+  margin-bottom: 0.15rem;
+}
+.stat-card .value {
+  font-size: 1.6rem;
+  font-weight: 700;
+  color: var(--brand-dark);
+}
+.stat-card.accent-gold { border-left-color: var(--gold); }
+.stat-card.accent-gold .value { color: var(--gold); }
+.stat-card.accent-ok { border-left-color: var(--ok); }
+.stat-card.accent-trial { border-left-color: var(--trial); }
+
+/* ---- Status badges ------------------------------------------------------ */
+.status-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35em;
+  padding: 0.28em 0.65em;
+  border-radius: 999px;
+  font-size: 0.78rem;
+  font-weight: 600;
+  white-space: nowrap;
+}
+.status-active   { background: var(--ok-tint);       color: var(--ok); }
+.status-trial    { background: var(--trial-tint);    color: var(--trial); }
+.status-frozen   { background: var(--frozen-tint);   color: var(--frozen); }
+.status-canceled { background: var(--canceled-tint); color: var(--canceled); }
+
+/* ---- Subscriptions table ------------------------------------------------ */
+.subs-table thead th {
+  color: var(--text-muted);
+  font-weight: 600;
+  font-size: 0.78rem;
+  border-bottom: 2px solid var(--border);
+  white-space: nowrap;
+  background: var(--surface);
+  position: sticky;
+  top: 0;
+  z-index: 1;
+}
+.subs-table td {
+  vertical-align: middle;
+  border-bottom: 1px solid var(--border);
+}
+.subs-table tbody tr:hover { background: var(--surface-2); }
+.subs-table tbody tr.row-canceled { opacity: 0.62; }
+.subs-table .sub-name { font-weight: 600; color: var(--text); }
+.subs-table .sub-category { color: var(--text-muted); font-size: 0.82rem; }
+
+.next-soon { color: var(--gold); font-weight: 700; }
+
+/* ---- Buttons ------------------------------------------------------------- */
+.btn-primary {
+  background: var(--brand);
+  border-color: var(--brand);
+}
+.btn-primary:hover { background: var(--brand-dark); border-color: var(--brand-dark); }
+.btn-outline-primary { color: var(--brand); border-color: var(--brand); }
+.btn-outline-primary:hover { background: var(--brand); border-color: var(--brand); }
+
+.action-icon-btn {
+  width: 34px; height: 34px;
+  display: inline-flex; align-items: center; justify-content: center;
+  border-radius: 8px;
+}
+
+/* ---- Dashboard / charts --------------------------------------------------- */
+.chart-card { padding: 1.1rem 1.2rem 0.6rem; }
+.chart-card h6 {
+  color: var(--text-muted);
+  font-weight: 650;
+  font-size: 0.85rem;
+  margin-bottom: 0.9rem;
+}
+.chart-wrap { position: relative; height: 300px; }
+.chart-wrap.short { height: 220px; }
+
+/* ---- Category legend / history list --------------------------------------- */
+.freq-table th, .freq-table td { padding: 0.45rem 0.7rem; }
+
+.history-list { max-height: 260px; overflow-y: auto; }
+.history-list .entry {
+  padding: 0.5rem 0;
+  border-bottom: 1px dashed var(--border);
+  font-size: 0.86rem;
+}
+.history-list .entry:last-child { border-bottom: none; }
+
+/* ---- Misc ------------------------------------------------------------------ */
+.section-title {
+  font-size: 1rem;
+  font-weight: 650;
+  color: var(--brand-dark);
+  margin: 1.6rem 0 0.8rem;
+}
+.empty-state {
+  text-align: center;
+  padding: 3rem 1rem;
+  color: var(--text-muted);
+}
+.empty-state i { font-size: 2.2rem; color: var(--border); }
+
+@media (max-width: 767px) {
+  .stat-card .value { font-size: 1.3rem; }
+  .chart-wrap { height: 240px; }
+}
+
+/* ---- Σκούρο θέμα (Bootstrap data-bs-theme="dark") ------------------------- */
+[data-bs-theme="dark"] {
+  --bg:            #10161B;
+  --surface:       #182027;
+  --surface-2:     #1F2A33;
+  --border:        #2C3944;
+  --text:          #E3E9EE;
+  --text-muted:    #93A3B1;
+
+  --brand:         #2E6A8E;
+  --brand-dark:    #8FC1DE;   /* στο σκούρο θέμα χρησιμοποιείται κυρίως για τίτλους/αριθμούς */
+  --brand-tint:    #1E3341;
+  --chart-brand:   #5B9BC0;
+
+  --gold:          #D9A34A;
+  --gold-tint:     #3A2F1A;
+
+  --ok:            #4FBF86;
+  --ok-tint:       #17352A;
+  --trial:         #6BA6D8;
+  --trial-tint:    #172D40;
+  --frozen:        #7FB4DC;
+  --frozen-tint:   #182F40;
+  --canceled:      #E27B6E;
+  --canceled-tint: #3D1E1B;
+
+  --shadow: 0 1px 2px rgba(0, 0, 0, 0.4);
+}
+[data-bs-theme="dark"] .app-navbar {
+  background: linear-gradient(180deg, #0B1E2A, #163B50);
+}
+[data-bs-theme="dark"] .btn-primary { background: var(--brand); border-color: var(--brand); color: #fff; }
+[data-bs-theme="dark"] .btn-primary:hover { background: #3A7DA6; border-color: #3A7DA6; }
+[data-bs-theme="dark"] .btn-outline-primary { color: var(--chart-brand); border-color: var(--chart-brand); }
+[data-bs-theme="dark"] .btn-outline-primary:hover { background: var(--brand); border-color: var(--brand); color: #fff; }
+[data-bs-theme="dark"] a { color: var(--chart-brand); }

@@ -1,0 +1,15 @@
+# SQLite βάση δεδομένων (δημιουργείται αυτόματα με το πρώτο άνοιγμα της εφαρμογής)
+/data/*
+!/data/.htaccess
+
+# Αντίγραφα ασφαλείας που παίρνονται πριν από migrations
+/data/backups/
+
+*.sqlite
+*.sqlite-journal
+*.sqlite-wal
+*.sqlite-shm
+*.db
+
+# Τοπικές ρυθμίσεις (π.χ. κωδικός διαχείρισης)
+config.local.php
