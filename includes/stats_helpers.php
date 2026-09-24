@@ -120,7 +120,13 @@ function computeForecastSpend(array $details, ?string $today = null): array
         $interval = new DateInterval(frequencyIntervalSpec($sub['frequency']));
         $cursor = new DateTime($nextDate);
         $safety = 0;
+        $remaining = $d['stats']['installments_remaining'] ?? null; // null = χωρίς όριο δόσεων
+        $counted = 0;
         while ($cursor <= $forecastEnd && $safety < 500) {
+            if ($remaining !== null && $counted >= $remaining) {
+                break; // δεν υπάρχουν άλλες δόσεις
+            }
+            $counted++;
             $dateStr = $cursor->format('Y-m-d');
             if ($dateStr >= $forecastStartStr && $dateStr <= $forecastEndStr) {
                 $ym = substr($dateStr, 0, 7);
@@ -148,7 +154,7 @@ function computeCategoryTotals(array $details): array
 {
     $out = [];
     foreach ($details as $d) {
-        if ($d['sub']['status'] === 'canceled') {
+        if (!isRunningStatus($d['sub']['status'])) {
             continue;
         }
         $cat = $d['sub']['category'];
@@ -178,7 +184,7 @@ function computeFrequencyTotals(array $details): array
         $out[$key] = ['label' => $label, 'count' => 0, 'monthly' => 0.0, 'annual' => 0.0];
     }
     foreach ($details as $d) {
-        if ($d['sub']['status'] === 'canceled') {
+        if (!isRunningStatus($d['sub']['status'])) {
             continue;
         }
         $f = $d['sub']['frequency'];
@@ -196,7 +202,7 @@ function computeFrequencyTotals(array $details): array
 /** Πλήθος συνδρομών ανά κατάσταση */
 function computeStatusCounts(array $details): array
 {
-    $out = ['active' => 0, 'trial' => 0, 'frozen' => 0, 'canceled' => 0];
+    $out = array_fill_keys(STATUS_KEYS, 0);
     foreach ($details as $d) {
         $out[$d['sub']['status']]++;
     }
@@ -243,7 +249,7 @@ function computeTopSubscriptions(array $details, int $limit = 5): array
 {
     $rows = [];
     foreach ($details as $d) {
-        if ($d['sub']['status'] === 'canceled') {
+        if (!isRunningStatus($d['sub']['status'])) {
             continue;
         }
         $rows[] = ['name' => $d['sub']['name'], 'annual' => $d['stats']['annual_cost']];

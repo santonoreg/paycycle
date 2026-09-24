@@ -113,6 +113,11 @@ Every time a subscription is "charged" (monthly/yearly/etc.), the app
   everything else that repeats — loans, installments for purchases, phones,
   insurance, etc. They work exactly like subscriptions (same frequencies, price
   history, freezes, payment ledger) and have their own categories.
+  A recurring payment can have an optional **number of installments** (e.g. a
+  12-month loan). The list then shows `paid / total` with the remaining count,
+  the forecast stops after the last installment, and once the last installment
+  date has passed the status automatically becomes **Paid off** (Εξοφλήθη).
+  Raising the number of installments later reactivates it.
 
 ## 6. Languages and Settings
 

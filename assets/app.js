@@ -40,6 +40,7 @@ document.addEventListener('DOMContentLoaded', function () {
       setVal('edit-payment-method', d.paymentMethod);
       setVal('edit-start-date', d.startDate);
       setVal('edit-notes', d.notes);
+      setVal('edit-installments', d.installments);
       setVal('price-sub-id', d.id);
 
       // Read-only fields (not logged in)
@@ -48,6 +49,7 @@ document.addEventListener('DOMContentLoaded', function () {
       setText('ro-payment-method', d.paymentMethod || '—');
       setText('ro-start-date', fmtDate(d.startDate));
       setText('ro-notes', d.notes || '—');
+      setText('ro-installments', d.installments || '—');
 
       // Payments ledger
       var payments = [];

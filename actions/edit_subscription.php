@@ -28,6 +28,20 @@ if ($category === '') $errors[] = t('err.category_required');
 if (!in_array($frequency, FREQUENCY_KEYS, true)) $errors[] = t('err.invalid_frequency');
 if (!DateTime::createFromFormat('Y-m-d', $startDate)) $errors[] = t('err.invalid_start');
 
+// Πλήθος δόσεων (μόνο αν στάλθηκε το πεδίο, δηλαδή για επαναλαμβανόμενες πληρωμές)
+$setInstallments = array_key_exists('installments', $_POST);
+$installments = null;
+if ($setInstallments) {
+    $raw = trim($_POST['installments']);
+    if ($raw !== '') {
+        if (!ctype_digit($raw) || (int) $raw < 1 || (int) $raw > 1200) {
+            $errors[] = t('err.invalid_installments');
+        } else {
+            $installments = (int) $raw;
+        }
+    }
+}
+
 if ($errors) {
     flash('danger', implode(' ', $errors));
     header('Location: ../' . backPage());
@@ -42,6 +56,12 @@ $old = $oldStmt->fetch();
 
 $stmt = $pdo->prepare("UPDATE subscriptions SET name=?, category=?, frequency=?, payment_method=?, start_date=?, notes=?, updated_at=datetime('now') WHERE id=?");
 $stmt->execute([$name, $category, $frequency, $paymentMethod, $startDate, $notes, $id]);
+
+if ($setInstallments) {
+    $pdo->prepare('UPDATE subscriptions SET total_installments=? WHERE id=?')->execute([$installments, $id]);
+    // Αν άλλαξε το πλήθος δόσεων: ενημέρωσε την κατάσταση (Εξοφλήθη <-> Ενεργή)
+    reconcileInstallmentStatus($pdo, $id);
+}
 
 // Αν άλλαξε η συχνότητα ή η ημερομηνία έναρξης, οι καταχωρημένες πληρωμές
 // (που είχαν υπολογιστεί με το παλιό βήμα) δεν ισχύουν πια: ξαναχτίζονται.

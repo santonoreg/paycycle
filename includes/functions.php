@@ -7,7 +7,13 @@
  */
 
 const FREQUENCY_KEYS = ['weekly', 'monthly', 'half-yearly', 'yearly', 'biennial', 'triennial'];
-const STATUS_KEYS = ['active', 'trial', 'frozen', 'canceled'];
+const STATUS_KEYS = ['active', 'trial', 'frozen', 'canceled', 'paid_off'];
+
+/** True για συνδρομές/πληρωμές που ΤΡΕΧΟΥΝ ακόμα (δεν είναι ακυρωμένες ούτε εξοφλημένες). */
+function isRunningStatus(string $status): bool
+{
+    return !in_array($status, ['canceled', 'paid_off'], true);
+}
 
 /** @return array<string,string> κλειδί συχνότητας => μεταφρασμένη ετικέτα */
 function frequencies(): array
@@ -159,7 +165,37 @@ function isFrozenAt(array $freezes, string $date): bool
  */
 function syncSubscriptionLedger(PDO $pdo, array $sub, array $prices, array $freezes, string $upToDate): int
 {
+    $inserted = syncSubscriptionLedgerRows($pdo, $sub, $prices, $freezes, $upToDate);
+    reconcileInstallmentStatus($pdo, (int) $sub['id']);
+    return $inserted;
+}
+
+/**
+ * Πληρωμές με συγκεκριμένο πλήθος δόσεων (total_installments): όταν έχουν
+ * καταχωρηθεί όλες οι δόσεις (δηλαδή πέρασε η ημερομηνία της τελευταίας), η
+ * κατάσταση γίνεται 'paid_off' (Εξοφλήθη). Αν αργότερα αυξηθεί το πλήθος δόσεων
+ * (ή αφαιρεθεί το όριο), επιστρέφει σε 'active'.
+ */
+function reconcileInstallmentStatus(PDO $pdo, int $subId): void
+{
+    $count = '(SELECT COUNT(*) FROM subscription_payments WHERE subscription_id = subscriptions.id)';
+    $pdo->prepare("UPDATE subscriptions SET status='paid_off', updated_at=datetime('now')
+                   WHERE id = ? AND status IN ('active','trial') AND total_installments IS NOT NULL AND $count >= total_installments")
+        ->execute([$subId]);
+    $pdo->prepare("UPDATE subscriptions SET status='active', updated_at=datetime('now')
+                   WHERE id = ? AND status = 'paid_off' AND (total_installments IS NULL OR $count < total_installments)")
+        ->execute([$subId]);
+}
+
+function syncSubscriptionLedgerRows(PDO $pdo, array $sub, array $prices, array $freezes, string $upToDate): int
+{
     $frequency = $sub['frequency'];
+
+    $limitStmt = $pdo->prepare('SELECT total_installments, (SELECT COUNT(*) FROM subscription_payments WHERE subscription_id = subscriptions.id) FROM subscriptions WHERE id = ?');
+    $limitStmt->execute([$sub['id']]);
+    [$totalInstallments, $recorded] = $limitStmt->fetch(PDO::FETCH_NUM) ?: [null, 0];
+    $totalInstallments = $totalInstallments !== null ? (int) $totalInstallments : null;
+    $recorded = (int) $recorded;
     $interval = new DateInterval(frequencyIntervalSpec($frequency));
 
     $stmt = $pdo->prepare('SELECT MAX(payment_date) FROM subscription_payments WHERE subscription_id = ?');
@@ -182,6 +218,9 @@ function syncSubscriptionLedger(PDO $pdo, array $sub, array $prices, array $free
     $inserted = 0;
     $safety = 0;
     while ($cursor <= $end && $safety < 5000) {
+        if ($totalInstallments !== null && $recorded + $inserted >= $totalInstallments) {
+            break; // όλες οι δόσεις έχουν ήδη καταχωρηθεί
+        }
         $d = $cursor->format('Y-m-d');
         if (!isFrozenAt($freezes, $d)) {
             $ins->execute([$sub['id'], $d, priceAtDate($prices, $d)]);
@@ -246,7 +285,10 @@ function computeSubscriptionStats(array $sub, array $prices, array $freezes, arr
     $nextPaymentDate = null;
     $nextPaymentAmount = null;
 
-    if (in_array($sub['status'], ['active', 'trial'], true)) {
+    $totalInstallments = isset($sub['total_installments']) && $sub['total_installments'] !== '' ? (int) $sub['total_installments'] : null;
+    $allPaid = $totalInstallments !== null && $installmentsPaid >= $totalInstallments;
+
+    if (in_array($sub['status'], ['active', 'trial'], true) && !$allPaid) {
         if ($lastPaymentDate !== null) {
             $cursor = new DateTime($lastPaymentDate);
             $cursor->add(new DateInterval(frequencyIntervalSpec($frequency)));
@@ -278,6 +320,8 @@ function computeSubscriptionStats(array $sub, array $prices, array $freezes, arr
         'next_payment_date'   => $nextPaymentDate,
         'next_payment_amount' => $nextPaymentAmount !== null ? round($nextPaymentAmount, 2) : null,
         'is_frozen_now'       => $sub['status'] === 'frozen',
+        'installments_total'     => $totalInstallments,
+        'installments_remaining' => $totalInstallments !== null ? max(0, $totalInstallments - $installmentsPaid) : null,
     ];
 }
 

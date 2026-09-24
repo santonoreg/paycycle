@@ -21,8 +21,11 @@ $startDate = $_POST['start_date'] ?? '';
 $cost = $_POST['cost'] ?? '';
 $status = $_POST['status'] ?? 'active';
 $notes = trim($_POST['notes'] ?? '') ?: null;
+$installmentsRaw = trim($_POST['installments'] ?? '');
 $kind = in_array($_POST['kind'] ?? '', KINDS, true) ? $_POST['kind'] : 'subscription';
 setKind($kind);
+// Πλήθος δόσεων: προαιρετικό, μόνο για επαναλαμβανόμενες πληρωμές
+$installments = null;
 
 $errors = [];
 if ($name === '') $errors[] = t('err.name_required');
@@ -31,6 +34,13 @@ if (!in_array($frequency, FREQUENCY_KEYS, true)) $errors[] = t('err.invalid_freq
 if (!DateTime::createFromFormat('Y-m-d', $startDate)) $errors[] = t('err.invalid_start');
 if (!is_numeric($cost) || (float) $cost < 0) $errors[] = t('err.invalid_cost');
 if (!in_array($status, ['active', 'trial'], true)) $status = 'active';
+if ($kind === 'recurring' && $installmentsRaw !== '') {
+    if (!ctype_digit($installmentsRaw) || (int) $installmentsRaw < 1 || (int) $installmentsRaw > 1200) {
+        $errors[] = t('err.invalid_installments');
+    } else {
+        $installments = (int) $installmentsRaw;
+    }
+}
 
 if ($errors) {
     flash('danger', implode(' ', $errors));
@@ -42,8 +52,8 @@ $pdo = getDb();
 $today = date('Y-m-d');
 $pdo->beginTransaction();
 try {
-    $stmt = $pdo->prepare('INSERT INTO subscriptions (name, category, frequency, payment_method, start_date, status, notes, kind) VALUES (?,?,?,?,?,?,?,?)');
-    $stmt->execute([$name, $category, $frequency, $paymentMethod, $startDate, $status, $notes, $kind]);
+    $stmt = $pdo->prepare('INSERT INTO subscriptions (name, category, frequency, payment_method, start_date, status, notes, kind, total_installments) VALUES (?,?,?,?,?,?,?,?,?)');
+    $stmt->execute([$name, $category, $frequency, $paymentMethod, $startDate, $status, $notes, $kind, $installments]);
     $subId = $pdo->lastInsertId();
 
     $stmt2 = $pdo->prepare('INSERT INTO subscription_prices (subscription_id, cost, effective_from) VALUES (?,?,?)');

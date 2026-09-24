@@ -22,7 +22,7 @@ $activeCount = 0;
 $monthlySum = 0.0;
 $annualSum = 0.0;
 foreach ($allDetails as $d) {
-    if ($d['sub']['status'] !== 'canceled') {
+    if (isRunningStatus($d['sub']['status'])) {
         $activeCount++;
         $monthlySum += $d['stats']['monthly_equivalent'];
         $annualSum += $d['stats']['annual_cost'];
@@ -48,7 +48,7 @@ $details = array_values(array_filter($allDetails, function ($d) use ($fStatus, $
 
 // --- Ταξινόμηση: ενεργές/δοκιμαστικές πρώτα (κατά επόμενη πληρωμή), μετά
 //     παγωμένες, μετά ακυρωμένες — μέσα σε κάθε ομάδα, αλφαβητικά ---------
-$statusPriority = ['active' => 0, 'trial' => 0, 'frozen' => 1, 'canceled' => 2];
+$statusPriority = ['active' => 0, 'trial' => 0, 'frozen' => 1, 'canceled' => 2, 'paid_off' => 2];
 usort($details, function ($a, $b) use ($statusPriority) {
     $pa = $statusPriority[$a['sub']['status']];
     $pb = $statusPriority[$b['sub']['status']];
@@ -100,7 +100,7 @@ require __DIR__ . '/includes/header.php';
   <form class="d-flex flex-wrap gap-2" method="get">
     <select name="status" class="form-select form-select-sm" style="width:auto" onchange="this.form.submit()">
       <option value=""><?= te('filter.all_statuses') ?></option>
-      <?php foreach (statuses() as $k => $label): ?>
+      <?php foreach (statuses() as $k => $label): if ($k === 'paid_off' && $kind !== 'recurring') continue; ?>
         <option value="<?= $k ?>" <?= $fStatus === $k ? 'selected' : '' ?>><?= htmlspecialchars($label) ?></option>
       <?php endforeach; ?>
     </select>
@@ -156,7 +156,7 @@ require __DIR__ . '/includes/header.php';
       <?php foreach ($details as $d):
         $sub = $d['sub']; $stats = $d['stats'];
         $days = daysUntil($stats['next_payment_date'], $today);
-        $rowClass = $sub['status'] === 'canceled' ? 'row-canceled' : '';
+        $rowClass = !isRunningStatus($sub['status']) ? 'row-canceled' : '';
         $pricesJson = htmlspecialchars(json_encode(array_map(fn($p) => [
             'id' => (int) $p['id'], 'cost' => (float) $p['cost'], 'effective_from' => $p['effective_from'],
             'deletable' => $p['deletable'],
@@ -182,7 +182,14 @@ require __DIR__ . '/includes/header.php';
               <span class="text-muted">—</span>
             <?php endif; ?>
           </td>
-          <td class="text-end num"><?= $stats['installments_paid'] ?></td>
+          <td class="text-end num">
+            <?php if ($stats['installments_total'] !== null): ?>
+              <?= $stats['installments_paid'] ?> / <?= $stats['installments_total'] ?>
+              <div class="sub-category"><?= te('inst.remaining', ['n' => $stats['installments_remaining']]) ?></div>
+            <?php else: ?>
+              <?= $stats['installments_paid'] ?>
+            <?php endif; ?>
+          </td>
           <td class="text-end num"><?= euro($stats['total_paid']) ?></td>
           <td>
             <span class="status-badge status-<?= $sub['status'] ?>"><?= te('status.' . $sub['status']) ?></span>
@@ -197,6 +204,7 @@ require __DIR__ . '/includes/header.php';
                 data-payment-method="<?= htmlspecialchars($sub['payment_method'] ?? '') ?>"
                 data-start-date="<?= $sub['start_date'] ?>"
                 data-notes="<?= htmlspecialchars($sub['notes'] ?? '') ?>"
+                data-installments="<?= (int) ($sub['total_installments'] ?? 0) ?: '' ?>"
                 data-status="<?= $sub['status'] ?>"
                 data-current-price="<?= $stats['current_price'] ?>"
                 data-prices='<?= $pricesJson ?>'
@@ -225,14 +233,14 @@ require __DIR__ . '/includes/header.php';
                     </li>
                   <?php endif; ?>
 
-                  <?php if ($sub['status'] !== 'canceled'): ?>
+                  <?php if (isRunningStatus($sub['status'])): ?>
                     <li>
                       <form method="post" action="actions/cancel.php" onsubmit="return confirm(<?= jsq(t('confirm.cancel', ['name' => $sub['name']])) ?>);">
                         <?= csrfField() ?><input type="hidden" name="id" value="<?= $sub['id'] ?>">
                         <button type="submit" class="dropdown-item text-danger"><i class="bi bi-x-circle me-2"></i><?= te('menu.cancel') ?></button>
                       </form>
                     </li>
-                  <?php else: ?>
+                  <?php elseif ($sub['status'] === 'canceled'): ?>
                     <li>
                       <form method="post" action="actions/reactivate.php">
                         <?= csrfField() ?><input type="hidden" name="id" value="<?= $sub['id'] ?>">
@@ -314,6 +322,13 @@ require __DIR__ . '/includes/header.php';
               </select>
             </div>
           </div>
+          <?php if ($kind === 'recurring'): ?>
+          <div class="mb-3">
+            <label class="form-label"><?= te('field.installments') ?></label>
+            <input type="number" min="1" max="1200" step="1" name="installments" class="form-control" placeholder="<?= te('field.installments_ph') ?>">
+            <div class="form-text"><?= te('field.installments_help') ?></div>
+          </div>
+          <?php endif; ?>
           <div class="mb-1">
             <label class="form-label"><?= te('field.notes') ?></label>
             <textarea name="notes" class="form-control" rows="2"></textarea>
@@ -386,6 +401,13 @@ require __DIR__ . '/includes/header.php';
                     <input type="date" name="start_date" id="edit-start-date" class="form-control" required>
                   </div>
                 </div>
+                <?php if ($kind === 'recurring'): ?>
+                <div class="mb-3">
+                  <label class="form-label"><?= te('field.installments') ?></label>
+                  <input type="number" min="1" max="1200" step="1" name="installments" id="edit-installments" class="form-control" placeholder="<?= te('field.installments_ph') ?>">
+                  <div class="form-text"><?= te('field.installments_help') ?></div>
+                </div>
+                <?php endif; ?>
                 <div class="mb-3">
                   <label class="form-label"><?= te('field.notes') ?></label>
                   <textarea name="notes" id="edit-notes" class="form-control" rows="2"></textarea>
@@ -398,6 +420,9 @@ require __DIR__ . '/includes/header.php';
                 <dt class="col-4"><?= te('field.frequency') ?></dt><dd class="col-8" id="ro-frequency"></dd>
                 <dt class="col-4"><?= te('field.payment_method') ?></dt><dd class="col-8" id="ro-payment-method"></dd>
                 <dt class="col-4"><?= te('field.start_date') ?></dt><dd class="col-8" id="ro-start-date"></dd>
+                <?php if ($kind === 'recurring'): ?>
+                <dt class="col-4"><?= te('field.installments') ?></dt><dd class="col-8" id="ro-installments"></dd>
+                <?php endif; ?>
                 <dt class="col-4"><?= te('field.notes') ?></dt><dd class="col-8" id="ro-notes"></dd>
               </dl>
               <a href="<?= htmlspecialchars(loginUrl(basename($_SERVER['SCRIPT_NAME']))) ?>" class="btn btn-outline-primary btn-sm mt-2">

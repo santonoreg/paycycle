@@ -250,3 +250,6 @@ a { color: var(--brand); }
   background: var(--surface);
   font-size: 0.9rem;
 }
+
+/* ---- Κατάσταση "Εξοφλήθη" ------------------------------------------------- */
+.status-paid_off { background: var(--surface-2); color: var(--text-muted); border: 1px solid var(--border); }

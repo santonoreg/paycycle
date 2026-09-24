@@ -22,7 +22,7 @@ $stmt = $pdo->prepare('SELECT * FROM subscriptions WHERE id=?');
 $stmt->execute([$id]);
 $sub = $stmt->fetch();
 
-if (!$sub || $sub['status'] === 'canceled') {
+if (!$sub || !isRunningStatus($sub['status'])) {
     flash('warning', t('msg.cancel_unavailable'));
     header('Location: ../' . backPage());
     exit;

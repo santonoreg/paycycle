@@ -219,4 +219,12 @@ return [
     'msg.sub_frozen@rec' => 'Die Zahlung „{name}“ wurde pausiert.',
     'msg.sub_unfrozen@rec' => 'Die Zahlung „{name}“ wurde fortgesetzt.',
     'msg.sub_reactivated@rec' => 'Die Zahlung „{name}“ wurde reaktiviert. Der Zeitraum der Kündigung zählt nicht als bezahlt.',
+
+    // Δόσεις
+    'status.paid_off' => 'Abbezahlt',
+    'field.installments' => 'Anzahl der Raten',
+    'field.installments_ph' => 'Optional, z. B. 12',
+    'field.installments_help' => 'Leer lassen, wenn es kein festes Ende gibt. Nach dem Datum der letzten Rate wird die Zahlung als „Abbezahlt“ markiert.',
+    'inst.remaining' => 'noch {n}',
+    'err.invalid_installments' => 'Ungültige Anzahl der Raten.',
 ];

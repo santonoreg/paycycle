@@ -15,7 +15,7 @@ $activeCount = 0;
 $monthlySum = 0.0;
 $annualSum = 0.0;
 foreach ($details as $d) {
-    if ($d['sub']['status'] !== 'canceled') {
+    if (isRunningStatus($d['sub']['status'])) {
         $activeCount++;
         $monthlySum += $d['stats']['monthly_equivalent'];
         $annualSum += $d['stats']['annual_cost'];

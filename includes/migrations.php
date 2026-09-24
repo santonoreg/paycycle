@@ -50,7 +50,70 @@ function getMigrations(): array
                 $pdo->exec('CREATE INDEX IF NOT EXISTS idx_subscriptions_kind ON subscriptions(kind)');
             },
         ],
+        4 => [
+            'name' => 'subscriptions.total_installments + status paid_off (table rebuild, data preserved)',
+            'own_transaction' => true,
+            'up'   => 'migrateInstallmentsAndPaidOff',
+        ],
     ];
+}
+
+/**
+ * Προσθέτει τη στήλη total_installments και την κατάσταση 'paid_off'.
+ * Το SQLite δεν αλλάζει CHECK constraints με ALTER, οπότε ο πίνακας ξαναχτίζεται
+ * (τυπική διαδικασία SQLite): τα foreign keys κλείνουν προσωρινά ώστε τα παιδικά
+ * records (τιμές, παγώματα, πληρωμές) να ΜΗΝ διαγραφούν από το DROP TABLE.
+ */
+function migrateInstallmentsAndPaidOff(PDO $pdo): void
+{
+    $cols = 'id, name, category, frequency, payment_method, start_date, status, canceled_date, notes, created_at, updated_at, kind';
+
+    $pdo->exec('PRAGMA foreign_keys = OFF');
+    $pdo->beginTransaction();
+    try {
+        $before = (int) $pdo->query('SELECT COUNT(*) FROM subscriptions')->fetchColumn();
+
+        $pdo->exec('DROP TABLE IF EXISTS subscriptions_new');
+        $pdo->exec("
+            CREATE TABLE subscriptions_new (
+                id                 INTEGER PRIMARY KEY AUTOINCREMENT,
+                name               TEXT NOT NULL,
+                category           TEXT NOT NULL,
+                frequency          TEXT NOT NULL CHECK(frequency IN ('weekly','monthly','half-yearly','yearly','biennial','triennial')),
+                payment_method     TEXT,
+                start_date         TEXT NOT NULL,
+                status             TEXT NOT NULL DEFAULT 'active' CHECK(status IN ('active','trial','frozen','canceled','paid_off')),
+                canceled_date      TEXT,
+                notes              TEXT,
+                created_at         TEXT NOT NULL DEFAULT (datetime('now')),
+                updated_at         TEXT NOT NULL DEFAULT (datetime('now')),
+                kind               TEXT NOT NULL DEFAULT 'subscription' CHECK(kind IN ('subscription','recurring')),
+                total_installments INTEGER CHECK(total_installments IS NULL OR total_installments >= 1)
+            )
+        ");
+        $pdo->exec("INSERT INTO subscriptions_new ($cols) SELECT $cols FROM subscriptions");
+
+        $after = (int) $pdo->query('SELECT COUNT(*) FROM subscriptions_new')->fetchColumn();
+        if ($before !== $after) {
+            throw new RuntimeException("Migration aborted: row count mismatch ($before vs $after)");
+        }
+
+        $pdo->exec('DROP TABLE subscriptions');
+        $pdo->exec('ALTER TABLE subscriptions_new RENAME TO subscriptions');
+        $pdo->exec('CREATE INDEX IF NOT EXISTS idx_subscriptions_kind ON subscriptions(kind)');
+
+        if ($pdo->query('PRAGMA foreign_key_check')->fetch()) {
+            throw new RuntimeException('Migration aborted: foreign key check failed');
+        }
+        $pdo->commit();
+    } catch (Throwable $e) {
+        if ($pdo->inTransaction()) {
+            $pdo->rollBack();
+        }
+        throw $e;
+    } finally {
+        $pdo->exec('PRAGMA foreign_keys = ON');
+    }
 }
 
 function runMigrations(PDO $pdo, bool $backupExisting = false): void
@@ -75,8 +138,8 @@ function runMigrations(PDO $pdo, bool $backupExisting = false): void
     }
 
     foreach ($pending as $version => $migration) {
-        // Το migration 1 χειρίζεται μόνο του τα transactions/foreign keys.
-        if ($version === 1) {
+        // Τα migrations 1 και 4 χειρίζονται μόνα τους τα transactions/foreign keys.
+        if ($version === 1 || !empty($migration['own_transaction'])) {
             call_user_func($migration['up'], $pdo);
         } else {
             $pdo->beginTransaction();
