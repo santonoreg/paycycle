@@ -179,4 +179,19 @@ return [
     'msg.sub_reactivated'   => 'Das Abo „{name}“ wurde reaktiviert. Der Zeitraum der Kündigung zählt nicht als bezahlt.',
     'msg.not_frozen'        => 'Das Abo ist nicht pausiert.',
     'msg.sub_unfrozen'      => 'Das Abo „{name}“ wurde fortgesetzt.',
+
+    // Passwort
+    'setup.heading' => 'Admin-Passwort erstellen',
+    'setup.help' => 'Es ist noch kein Admin-Passwort festgelegt. Wähle eines (mindestens {n} Zeichen). Es wird nur als Hash in der Datenbank gespeichert.',
+    'setup.submit' => 'Passwort erstellen',
+    'setup.done' => 'Admin-Passwort erstellt.',
+    'pw.confirm' => 'Passwort bestätigen',
+    'pw.current' => 'Aktuelles Passwort',
+    'pw.new' => 'Neues Passwort',
+    'pw.too_short' => 'Das Passwort muss mindestens {n} Zeichen lang sein.',
+    'pw.mismatch' => 'Die Passwörter stimmen nicht überein.',
+    'pw.wrong_current' => 'Das aktuelle Passwort ist falsch.',
+    'pw.changed' => 'Passwort geändert.',
+    'settings.password' => 'Admin-Passwort ändern',
+    'settings.change_password' => 'Passwort ändern',
 ];

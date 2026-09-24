@@ -3,7 +3,7 @@ require __DIR__ . '/config.php';
 require __DIR__ . '/includes/db.php';
 require __DIR__ . '/includes/auth.php';
 require __DIR__ . '/includes/functions.php';
-require __DIR__ . '/includes/i18n.php';
+require_once __DIR__ . '/includes/i18n.php';
 
 $pdo = getDb();
 $settings = getSettings();
@@ -80,6 +80,28 @@ require __DIR__ . '/includes/header.php';
         <button type="submit" class="btn btn-primary" <?= $disabled ?>><i class="bi bi-check-lg"></i> <?= te('settings.save') ?></button>
       </div>
     </form>
+
+    <?php if ($loggedIn): ?>
+    <form method="post" action="actions/change_password.php" class="card p-3 p-md-4 mt-3">
+      <?= csrfField() ?>
+      <div class="form-label fw-semibold"><i class="bi bi-key"></i> <?= te('settings.password') ?></div>
+      <div class="mb-2">
+        <label class="form-label small mb-1" for="pw-current"><?= te('pw.current') ?></label>
+        <input type="password" name="current_password" id="pw-current" class="form-control" required autocomplete="current-password">
+      </div>
+      <div class="row g-2 mb-3">
+        <div class="col-12 col-sm-6">
+          <label class="form-label small mb-1" for="pw-new"><?= te('pw.new') ?></label>
+          <input type="password" name="new_password" id="pw-new" class="form-control" required minlength="<?= MIN_PASSWORD_LENGTH ?>" autocomplete="new-password">
+        </div>
+        <div class="col-12 col-sm-6">
+          <label class="form-label small mb-1" for="pw-confirm"><?= te('pw.confirm') ?></label>
+          <input type="password" name="new_password_confirm" id="pw-confirm" class="form-control" required minlength="<?= MIN_PASSWORD_LENGTH ?>" autocomplete="new-password">
+        </div>
+      </div>
+      <div><button type="submit" class="btn btn-outline-primary"><i class="bi bi-check-lg"></i> <?= te('settings.change_password') ?></button></div>
+    </form>
+    <?php endif; ?>
   </div>
 </div>
 

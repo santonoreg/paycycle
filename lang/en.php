@@ -190,4 +190,19 @@ return [
     'msg.sub_reactivated'   => 'The subscription "{name}" was reactivated. The period it was canceled does not count as paid.',
     'msg.not_frozen'        => 'The subscription is not frozen.',
     'msg.sub_unfrozen'      => 'The subscription "{name}" was unfrozen.',
+
+    // Passwort
+    'setup.heading' => 'Create admin password',
+    'setup.help' => 'No admin password is set yet. Choose one (at least {n} characters). It is stored only as a hash in the database.',
+    'setup.submit' => 'Create password',
+    'setup.done' => 'Admin password created.',
+    'pw.confirm' => 'Confirm password',
+    'pw.current' => 'Current password',
+    'pw.new' => 'New password',
+    'pw.too_short' => 'The password must be at least {n} characters.',
+    'pw.mismatch' => 'The passwords do not match.',
+    'pw.wrong_current' => 'The current password is wrong.',
+    'pw.changed' => 'Password changed.',
+    'settings.password' => 'Change admin password',
+    'settings.change_password' => 'Change password',
 ];

@@ -6,6 +6,53 @@
  * απαιτούν να έχει γίνει login.
  */
 
+require_once __DIR__ . '/i18n.php';
+
+const MIN_PASSWORD_LENGTH = 8;
+
+/**
+ * Το hash του κωδικού διαχείρισης από τη βάση ('' αν δεν έχει οριστεί).
+ * Αν λείπει από τη βάση αλλά υπάρχει παλιό APP_PASSWORD_HASH (config.local.php
+ * από προηγούμενη έκδοση), εισάγεται εδώ μία φορά.
+ */
+function adminPasswordHash(): string
+{
+    $hash = getSetting('admin_password_hash');
+    if ($hash === '' && defined('APP_PASSWORD_HASH') && APP_PASSWORD_HASH !== '') {
+        saveSettings(getDb(), ['admin_password_hash' => APP_PASSWORD_HASH]);
+        $hash = APP_PASSWORD_HASH;
+    }
+    return $hash;
+}
+
+function isPasswordSet(): bool
+{
+    return adminPasswordHash() !== '';
+}
+
+function verifyAdminPassword(string $password): bool
+{
+    $hash = adminPasswordHash();
+    return $hash !== '' && password_verify($password, $hash);
+}
+
+function setAdminPassword(string $password): void
+{
+    saveSettings(getDb(), ['admin_password_hash' => password_hash($password, PASSWORD_DEFAULT)]);
+}
+
+/** @return string|null μήνυμα σφάλματος, ή null αν ο νέος κωδικός είναι έγκυρος */
+function validateNewPassword(string $password, string $confirm): ?string
+{
+    if (mb_strlen($password) < MIN_PASSWORD_LENGTH) {
+        return t('pw.too_short', ['n' => MIN_PASSWORD_LENGTH]);
+    }
+    if ($password !== $confirm) {
+        return t('pw.mismatch');
+    }
+    return null;
+}
+
 function isLoggedIn(): bool
 {
     return !empty($_SESSION['authenticated']) && $_SESSION['authenticated'] === true;
