@@ -118,6 +118,9 @@ Every time a subscription is "charged" (monthly/yearly/etc.), the app
   the forecast stops after the last installment, and once the last installment
   date has passed the status automatically becomes **Paid off** (Εξοφλήθη).
   Raising the number of installments later reactivates it.
+  In the totals and charts, a payment with a fixed number of installments counts
+  its plan total spread over the year: a purchase of 3 installments of €46.33
+  counts €138.99 per year (€11.58 per month), not €46.33 every month.
   For bills whose amount is unknown until issued (electricity, mobile...), tick
   **Variable amount (bill)**. Each period is then recorded as an *estimate* (the
   average of your last 3 confirmed bills, or the estimate you typed at first) and

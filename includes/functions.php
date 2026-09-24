@@ -61,14 +61,25 @@ function periodsPerYear(string $frequency): float
     };
 }
 
-function monthlyEquivalent(float $cost, string $frequency): float
+/**
+ * Πόσες δόσεις πέφτουν σε ένα έτος. Για πληρωμή με ΣΥΓΚΕΚΡΙΜΕΝΟ πλήθος δόσεων
+ * (π.χ. αγορά σε 3 δόσεις) το ετήσιο κόστος δεν μπορεί να ξεπερνά το συνολικό
+ * ποσό του πλάνου: 3 δόσεις = 3 φορές το ποσό, όχι 12.
+ */
+function installmentsPerYear(string $frequency, ?int $totalInstallments = null): float
 {
-    return $cost * periodsPerYear($frequency) / 12.0;
+    $perYear = periodsPerYear($frequency);
+    return $totalInstallments !== null ? min($perYear, (float) $totalInstallments) : $perYear;
 }
 
-function annualCost(float $cost, string $frequency): float
+function monthlyEquivalent(float $cost, string $frequency, ?int $totalInstallments = null): float
 {
-    return $cost * periodsPerYear($frequency);
+    return $cost * installmentsPerYear($frequency, $totalInstallments) / 12.0;
+}
+
+function annualCost(float $cost, string $frequency, ?int $totalInstallments = null): float
+{
+    return $cost * installmentsPerYear($frequency, $totalInstallments);
 }
 
 /**
@@ -376,8 +387,8 @@ function computeSubscriptionStats(array $sub, array $prices, array $freezes, arr
         'installments_paid'   => $installmentsPaid,
         'total_paid'          => round($totalPaid, 2),
         'current_price'       => round($currentPrice, 2),
-        'monthly_equivalent'  => round(monthlyEquivalent($currentPrice, $frequency), 2),
-        'annual_cost'         => round(annualCost($currentPrice, $frequency), 2),
+        'monthly_equivalent'  => round(monthlyEquivalent($currentPrice, $frequency, $totalInstallments), 2),
+        'annual_cost'         => round(annualCost($currentPrice, $frequency, $totalInstallments), 2),
         'next_payment_date'   => $nextPaymentDate,
         'next_payment_amount' => $nextPaymentAmount !== null ? round($nextPaymentAmount, 2) : null,
         'is_frozen_now'       => $sub['status'] === 'frozen',

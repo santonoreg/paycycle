@@ -33,6 +33,10 @@ function insertPrice(PDO $pdo, int $subId, float $cost, string $effectiveFrom): 
 
 // --- Pure helper tests (no DB) -------------------------------------------
 check('monthlyEquivalent(120,yearly)', round(monthlyEquivalent(120, 'yearly'), 2), 10.0);
+check('annualCost 3 monthly installments = 3x', round(annualCost(46.33, 'monthly', 3), 2), 138.99);
+check('monthlyEquivalent 3 installments = total/12', round(monthlyEquivalent(46.33, 'monthly', 3), 2), 11.58);
+check('annualCost 24 monthly installments capped at 12', round(annualCost(100, 'monthly', 24), 2), 1200.0);
+check('annualCost yearly with 3 installments stays 1x/yr', round(annualCost(100, 'yearly', 3), 2), 100.0);
 check('annualCost(2,weekly)', round(annualCost(2, 'weekly'), 2), 104.0);
 check('priceAtDate mid-history', priceAtDate([['cost' => 5, 'effective_from' => '2026-01-01'], ['cost' => 10, 'effective_from' => '2026-04-01']], '2026-05-01'), 10.0);
 check('isFrozenAt inside open freeze', isFrozenAt([['frozen_from' => '2026-05-01', 'frozen_until' => null]], '2026-06-01'), true);
