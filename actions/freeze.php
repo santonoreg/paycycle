@@ -8,7 +8,7 @@ require_once __DIR__ . '/../includes/i18n.php';
 requireLogin();
 
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
-    header('Location: ../index.php');
+    header('Location: ../' . backPage());
     exit;
 }
 verifyCsrf();
@@ -16,6 +16,7 @@ verifyCsrf();
 $id = (int) ($_POST['id'] ?? 0);
 $today = date('Y-m-d');
 $pdo = getDb();
+useKindOf($pdo, $id);
 
 $stmt = $pdo->prepare('SELECT * FROM subscriptions WHERE id=?');
 $stmt->execute([$id]);
@@ -23,7 +24,7 @@ $sub = $stmt->fetch();
 
 if (!$sub || !in_array($sub['status'], ['active', 'trial'], true)) {
     flash('warning', t('msg.cannot_freeze'));
-    header('Location: ../index.php');
+    header('Location: ../' . backPage());
     exit;
 }
 
@@ -38,5 +39,5 @@ try {
     flash('danger', t('msg.error', ['error' => $e->getMessage()]));
 }
 
-header('Location: ../index.php');
+header('Location: ../' . backPage());
 exit;

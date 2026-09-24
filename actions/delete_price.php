@@ -8,7 +8,7 @@ require_once __DIR__ . '/../includes/i18n.php';
 requireLogin();
 
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
-    header('Location: ../index.php');
+    header('Location: ../' . backPage());
     exit;
 }
 verifyCsrf();
@@ -17,6 +17,7 @@ $subId = (int) ($_POST['id'] ?? 0);
 $priceId = (int) ($_POST['price_id'] ?? 0);
 
 $pdo = getDb();
+useKindOf($pdo, $subId);
 
 $pricesStmt = $pdo->prepare('SELECT id, cost, effective_from FROM subscription_prices WHERE subscription_id=? ORDER BY effective_from ASC, id ASC');
 $pricesStmt->execute([$subId]);
@@ -46,5 +47,5 @@ if ($index === null) {
     flash('success', t('msg.price_deleted'));
 }
 
-header('Location: ../index.php');
+header('Location: ../' . backPage());
 exit;

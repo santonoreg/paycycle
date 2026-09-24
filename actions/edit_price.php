@@ -8,7 +8,7 @@ require_once __DIR__ . '/../includes/i18n.php';
 requireLogin();
 
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
-    header('Location: ../index.php');
+    header('Location: ../' . backPage());
     exit;
 }
 verifyCsrf();
@@ -18,6 +18,7 @@ $cost = $_POST['cost'] ?? '';
 $effectiveFrom = $_POST['effective_from'] ?? '';
 
 $pdo = getDb();
+useKindOf($pdo, $id);
 
 $errors = [];
 if ($id <= 0) $errors[] = t('err.unknown_sub');
@@ -32,7 +33,7 @@ if (!$errors) {
 
 if ($errors) {
     flash('danger', implode(' ', $errors));
-    header('Location: ../index.php');
+    header('Location: ../' . backPage());
     exit;
 }
 
@@ -61,5 +62,5 @@ if (!empty($rows)) {
     $msg .= t('msg.price_retro', ['n' => count($rows)]);
 }
 flash('success', $msg);
-header('Location: ../index.php');
+header('Location: ../' . backPage());
 exit;

@@ -104,10 +104,15 @@ Every time a subscription is "charged" (monthly/yearly/etc.), the app
   Price history (add a new price here when the cost changes), Freezes.
 - **Freeze / Unfreeze / Cancel / Reactivate / Delete**: from the (⋮) menu on
   each row.
-- **Statistics**: second item in the top menu. Cost by category, 12-month
-  history and forecast, spending per year, most expensive subscriptions,
-  subscription status, totals by frequency.
+- **Statistics**: cost by category, 12-month history and forecast, spending per
+  year, most expensive items and totals by frequency. The summary cards and each
+  chart show subscriptions and recurring payments **together** by default; every
+  chart card has tabs to view **Subscriptions** or **Recurring payments** only.
 - **Filters** on the main page: status, category, search by name.
+- **Recurring payments** (menu item next to Subscriptions): the same list for
+  everything else that repeats — loans, installments for purchases, phones,
+  insurance, etc. They work exactly like subscriptions (same frequencies, price
+  history, freezes, payment ledger) and have their own categories.
 
 ## 6. Languages and Settings
 
@@ -140,6 +145,7 @@ includes/functions.php      calculation core + the "payment ledger"
 includes/stats_helpers.php  aggregates for the dashboard
 lang/el.php, en.php, de.php translations
 index.php                   main subscription list
+recurring.php               recurring payments list (same view, kind = recurring)
 stats.php                   dashboard with charts
 settings.php                settings page
 login.php / logout.php

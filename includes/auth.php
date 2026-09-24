@@ -88,9 +88,21 @@ function csrfToken(): string
     return $_SESSION['csrf_token'];
 }
 
+/** Σελίδες λίστας στις οποίες επιστρέφουν οι ενέργειες μετά την ολοκλήρωση. */
+const LIST_PAGES = ['index.php', 'recurring.php'];
+
+/** Η σελίδα λίστας στην οποία γυρίζει ο χρήστης μετά από μια ενέργεια (whitelist). */
+function backPage(): string
+{
+    $b = $_POST['back'] ?? '';
+    return in_array($b, LIST_PAGES, true) ? $b : 'index.php';
+}
+
 function csrfField(): string
 {
-    return '<input type="hidden" name="csrf_token" value="' . htmlspecialchars(csrfToken()) . '">';
+    $page = basename($_SERVER['SCRIPT_NAME'] ?? '');
+    $back = in_array($page, LIST_PAGES, true) ? '<input type="hidden" name="back" value="' . $page . '">' : '';
+    return '<input type="hidden" name="csrf_token" value="' . htmlspecialchars(csrfToken()) . '">' . $back;
 }
 
 function verifyCsrf(): void

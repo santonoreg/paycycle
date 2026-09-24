@@ -111,6 +111,19 @@ function loadLangFile(string $lang): array
     return $files[$lang];
 }
 
+const KINDS = ['subscription', 'recurring'];
+
+/** Ο τύπος εγγραφών που εμφανίζεται τώρα: επηρεάζει τις μεταφράσεις με επίθημα "@rec". */
+function setKind(string $kind): void
+{
+    $GLOBALS['app_kind'] = in_array($kind, KINDS, true) ? $kind : 'subscription';
+}
+
+function currentKind(): string
+{
+    return $GLOBALS['app_kind'] ?? 'subscription';
+}
+
 /**
  * Μετάφραση κλειδιού. Placeholders της μορφής {name}. Αν λείπει η μετάφραση,
  * πέφτει στα ελληνικά και τέλος στο ίδιο το κλειδί.
@@ -118,7 +131,12 @@ function loadLangFile(string $lang): array
 function t(string $key, array $params = []): string
 {
     $lang = currentLang();
-    $val = loadLangFile($lang)[$key] ?? loadLangFile(DEFAULT_LANGUAGE)[$key] ?? $key;
+    $val = null;
+    if (currentKind() === 'recurring') {
+        // π.χ. 'btn.new_sub@rec' = εναλλακτική διατύπωση για τις "Πάγιες πληρωμές"
+        $val = loadLangFile($lang)[$key . '@rec'] ?? loadLangFile(DEFAULT_LANGUAGE)[$key . '@rec'] ?? null;
+    }
+    $val = $val ?? loadLangFile($lang)[$key] ?? loadLangFile(DEFAULT_LANGUAGE)[$key] ?? $key;
     if (!is_string($val)) {
         return $key;
     }

@@ -227,3 +227,26 @@ a { color: var(--brand); }
 [data-bs-theme="dark"] .btn-outline-primary { color: var(--chart-brand); border-color: var(--chart-brand); }
 [data-bs-theme="dark"] .btn-outline-primary:hover { background: var(--brand); border-color: var(--brand); color: #fff; }
 [data-bs-theme="dark"] a { color: var(--chart-brand); }
+
+/* ---- Καρτέλες scope στις κάρτες γραφημάτων ------------------------------------ */
+.chart-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  margin-bottom: 0.9rem;
+}
+.chart-card .chart-head h6 { margin-bottom: 0; }
+.scope-tabs .btn { font-size: 0.78rem; padding: 0.15rem 0.6rem; }
+.scope-tabs .btn.active { background: var(--brand); border-color: var(--brand); color: #fff; }
+.chart-empty {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-muted);
+  background: var(--surface);
+  font-size: 0.9rem;
+}

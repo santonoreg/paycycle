@@ -6,11 +6,15 @@ require __DIR__ . '/includes/functions.php';
 require_once __DIR__ . '/includes/i18n.php';
 require __DIR__ . '/includes/stats_helpers.php';
 
+// recurring.php ορίζει $kind = 'recurring' και φορτώνει αυτό το αρχείο.
+$kind = $kind ?? 'subscription';
+setKind($kind);
+
 $pdo = getDb();
 $today = date('Y-m-d');
 
-$allDetails = getAllSubscriptionsWithDetails($pdo, $today);
-$categories = getDistinctCategories($pdo);
+$allDetails = getAllSubscriptionsWithDetails($pdo, $today, $kind);
+$categories = getDistinctCategories($pdo, $kind);
 $paymentMethods = getDistinctPaymentMethods($pdo);
 
 // --- Συγκεντρωτικά (πάντα υπολογισμένα στο σύνολο, ανεξάρτητα από φίλτρα) ----
@@ -109,7 +113,7 @@ require __DIR__ . '/includes/header.php';
     <input type="search" name="q" value="<?= htmlspecialchars($fQuery) ?>" class="form-control form-control-sm" style="width:auto" placeholder="<?= te('filter.search') ?>">
     <button class="btn btn-sm btn-outline-secondary" type="submit"><i class="bi bi-search"></i></button>
     <?php if ($fStatus || $fCategory || $fQuery): ?>
-      <a href="index.php?status=&amp;category=" class="btn btn-sm btn-link"><?= te('common.clear') ?></a>
+      <a href="<?= basename($_SERVER['SCRIPT_NAME']) ?>?status=&amp;category=" class="btn btn-sm btn-link"><?= te('common.clear') ?></a>
     <?php endif; ?>
   </form>
 
@@ -118,7 +122,7 @@ require __DIR__ . '/includes/header.php';
       <i class="bi bi-plus-lg"></i> <?= te('btn.new_sub') ?>
     </button>
   <?php else: ?>
-    <a class="btn btn-outline-primary btn-sm" href="<?= htmlspecialchars(loginUrl('index.php')) ?>">
+    <a class="btn btn-outline-primary btn-sm" href="<?= htmlspecialchars(loginUrl(basename($_SERVER['SCRIPT_NAME']))) ?>">
       <i class="bi bi-plus-lg"></i> <?= te('btn.new_sub') ?>
     </a>
   <?php endif; ?>
@@ -263,6 +267,7 @@ require __DIR__ . '/includes/header.php';
     <div class="modal-content">
       <form method="post" action="actions/add_subscription.php">
         <?= csrfField() ?>
+        <input type="hidden" name="kind" value="<?= $kind ?>">
         <div class="modal-header">
           <h5 class="modal-title"><i class="bi bi-plus-lg"></i> <?= te('modal.new_sub') ?></h5>
           <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
@@ -395,7 +400,7 @@ require __DIR__ . '/includes/header.php';
                 <dt class="col-4"><?= te('field.start_date') ?></dt><dd class="col-8" id="ro-start-date"></dd>
                 <dt class="col-4"><?= te('field.notes') ?></dt><dd class="col-8" id="ro-notes"></dd>
               </dl>
-              <a href="<?= htmlspecialchars(loginUrl('index.php')) ?>" class="btn btn-outline-primary btn-sm mt-2">
+              <a href="<?= htmlspecialchars(loginUrl(basename($_SERVER['SCRIPT_NAME']))) ?>" class="btn btn-outline-primary btn-sm mt-2">
                 <i class="bi bi-lock"></i> <?= te('btn.login_manage') ?>
               </a>
             <?php endif; ?>

@@ -39,6 +39,17 @@ function getMigrations(): array
                 }
             },
         ],
+        3 => [
+            'name' => 'subscriptions.kind (subscription | recurring payment)',
+            'up'   => function (PDO $pdo): void {
+                // Οι υπάρχουσες εγγραφές γίνονται αυτόματα 'subscription' (DEFAULT).
+                $cols = array_column($pdo->query('PRAGMA table_info(subscriptions)')->fetchAll(), 'name');
+                if (!in_array('kind', $cols, true)) {
+                    $pdo->exec("ALTER TABLE subscriptions ADD COLUMN kind TEXT NOT NULL DEFAULT 'subscription' CHECK(kind IN ('subscription','recurring'))");
+                }
+                $pdo->exec('CREATE INDEX IF NOT EXISTS idx_subscriptions_kind ON subscriptions(kind)');
+            },
+        ],
     ];
 }
 

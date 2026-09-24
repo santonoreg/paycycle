@@ -2,6 +2,9 @@
 require_once __DIR__ . '/i18n.php';
 /** @var string $pageTitle */
 $pageTitle = $pageTitle ?? t('page.subscriptions');
+$navKind = currentKind();
+setKind('subscription'); // η πλοήγηση δεν αλλάζει διατύπωση
+
 $currentScript = basename($_SERVER['SCRIPT_NAME']);
 $themePref = getSetting('theme');
 if (!in_array($themePref, THEMES, true)) {
@@ -45,6 +48,11 @@ $backTo = $currentScript . (!empty($_SERVER['QUERY_STRING']) ? '?' . $_SERVER['Q
         <li class="nav-item">
           <a class="nav-link <?= $currentScript === 'index.php' ? 'active' : '' ?>" href="index.php">
             <i class="bi bi-list-ul"></i> <?= te('nav.subscriptions') ?>
+          </a>
+        </li>
+        <li class="nav-item">
+          <a class="nav-link <?= $currentScript === 'recurring.php' ? 'active' : '' ?>" href="recurring.php">
+            <i class="bi bi-arrow-repeat"></i> <?= te('nav.recurring') ?>
           </a>
         </li>
         <li class="nav-item">
@@ -94,6 +102,7 @@ $backTo = $currentScript . (!empty($_SERVER['QUERY_STRING']) ? '?' . $_SERVER['Q
     </div>
   </div>
 </nav>
+<?php setKind($navKind); ?>
 <div class="container-fluid px-3 px-md-4 pb-5">
 <?php
 if (!empty($_SESSION['flash'])) {

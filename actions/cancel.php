@@ -8,7 +8,7 @@ require_once __DIR__ . '/../includes/i18n.php';
 requireLogin();
 
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
-    header('Location: ../index.php');
+    header('Location: ../' . backPage());
     exit;
 }
 verifyCsrf();
@@ -16,6 +16,7 @@ verifyCsrf();
 $id = (int) ($_POST['id'] ?? 0);
 $today = date('Y-m-d');
 $pdo = getDb();
+useKindOf($pdo, $id);
 
 $stmt = $pdo->prepare('SELECT * FROM subscriptions WHERE id=?');
 $stmt->execute([$id]);
@@ -23,7 +24,7 @@ $sub = $stmt->fetch();
 
 if (!$sub || $sub['status'] === 'canceled') {
     flash('warning', t('msg.cancel_unavailable'));
-    header('Location: ../index.php');
+    header('Location: ../' . backPage());
     exit;
 }
 
@@ -41,5 +42,5 @@ $stmt = $pdo->prepare("UPDATE subscriptions SET status='canceled', canceled_date
 $stmt->execute([$today, $id]);
 
 flash('success', t('msg.sub_canceled', ['name' => $sub['name']]));
-header('Location: ../index.php');
+header('Location: ../' . backPage());
 exit;

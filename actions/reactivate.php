@@ -8,13 +8,14 @@ require_once __DIR__ . '/../includes/i18n.php';
 requireLogin();
 
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
-    header('Location: ../index.php');
+    header('Location: ../' . backPage());
     exit;
 }
 verifyCsrf();
 
 $id = (int) ($_POST['id'] ?? 0);
 $pdo = getDb();
+useKindOf($pdo, $id);
 
 $stmt = $pdo->prepare('SELECT * FROM subscriptions WHERE id=?');
 $stmt->execute([$id]);
@@ -22,7 +23,7 @@ $sub = $stmt->fetch();
 
 if (!$sub || $sub['status'] !== 'canceled') {
     flash('warning', t('msg.not_canceled'));
-    header('Location: ../index.php');
+    header('Location: ../' . backPage());
     exit;
 }
 
@@ -40,10 +41,10 @@ try {
 } catch (Throwable $e) {
     $pdo->rollBack();
     flash('danger', t('msg.error', ['error' => $e->getMessage()]));
-    header('Location: ../index.php');
+    header('Location: ../' . backPage());
     exit;
 }
 
 flash('success', t('msg.sub_reactivated', ['name' => $sub['name']]));
-header('Location: ../index.php');
+header('Location: ../' . backPage());
 exit;

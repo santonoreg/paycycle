@@ -8,7 +8,7 @@ require_once __DIR__ . '/../includes/i18n.php';
 requireLogin();
 
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
-    header('Location: ../index.php');
+    header('Location: ../' . backPage());
     exit;
 }
 verifyCsrf();
@@ -21,6 +21,8 @@ $startDate = $_POST['start_date'] ?? '';
 $cost = $_POST['cost'] ?? '';
 $status = $_POST['status'] ?? 'active';
 $notes = trim($_POST['notes'] ?? '') ?: null;
+$kind = in_array($_POST['kind'] ?? '', KINDS, true) ? $_POST['kind'] : 'subscription';
+setKind($kind);
 
 $errors = [];
 if ($name === '') $errors[] = t('err.name_required');
@@ -32,7 +34,7 @@ if (!in_array($status, ['active', 'trial'], true)) $status = 'active';
 
 if ($errors) {
     flash('danger', implode(' ', $errors));
-    header('Location: ../index.php');
+    header('Location: ../' . backPage());
     exit;
 }
 
@@ -40,8 +42,8 @@ $pdo = getDb();
 $today = date('Y-m-d');
 $pdo->beginTransaction();
 try {
-    $stmt = $pdo->prepare('INSERT INTO subscriptions (name, category, frequency, payment_method, start_date, status, notes) VALUES (?,?,?,?,?,?,?)');
-    $stmt->execute([$name, $category, $frequency, $paymentMethod, $startDate, $status, $notes]);
+    $stmt = $pdo->prepare('INSERT INTO subscriptions (name, category, frequency, payment_method, start_date, status, notes, kind) VALUES (?,?,?,?,?,?,?,?)');
+    $stmt->execute([$name, $category, $frequency, $paymentMethod, $startDate, $status, $notes, $kind]);
     $subId = $pdo->lastInsertId();
 
     $stmt2 = $pdo->prepare('INSERT INTO subscription_prices (subscription_id, cost, effective_from) VALUES (?,?,?)');
@@ -64,5 +66,5 @@ try {
     flash('danger', t('msg.save_error', ['error' => $e->getMessage()]));
 }
 
-header('Location: ../index.php');
+header('Location: ../' . backPage());
 exit;

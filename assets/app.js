@@ -80,12 +80,14 @@ document.addEventListener('DOMContentLoaded', function () {
           pricesList.innerHTML = '<div class="text-muted small">' + escapeHtml(I18N.js.no_prices) + '</div>';
         } else {
           var csrfInput = document.querySelector('#editPriceForm [name="csrf_token"]');
+          var backInput = document.querySelector('#editPriceForm [name="back"]');
           pricesList.innerHTML = prices.map(function (p) {
             var del = '';
             if (csrfInput && p.deletable) {
               del = ' <form method="post" action="actions/delete_price.php" class="d-inline ms-2" ' +
                 'onsubmit="return confirm(' + escapeHtml(JSON.stringify(I18N.js.confirm_delete_price)) + ');">' +
                 '<input type="hidden" name="csrf_token" value="' + csrfInput.value + '">' +
+                (backInput ? '<input type="hidden" name="back" value="' + escapeHtml(backInput.value) + '">' : '') +
                 '<input type="hidden" name="id" value="' + d.id + '">' +
                 '<input type="hidden" name="price_id" value="' + p.id + '">' +
                 '<button type="submit" class="btn btn-sm btn-outline-danger py-0 px-1" title="' + escapeHtml(I18N.js.delete_price) + '">' +

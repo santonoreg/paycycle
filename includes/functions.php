@@ -318,12 +318,18 @@ function daysUntil(?string $ymd, ?string $today = null): ?int
  * ενημερωμένο μέχρι $today πριν διαβαστεί.
  * @return array<int, array{sub: array, prices: array, freezes: array, payments: array, stats: array}>
  */
-function getAllSubscriptionsWithDetails(PDO $pdo, ?string $today = null): array
+function getAllSubscriptionsWithDetails(PDO $pdo, ?string $today = null, ?string $kind = null): array
 {
     $today = $today ?? date('Y-m-d');
     syncAllLedgers($pdo, $today);
 
-    $subs = $pdo->query('SELECT * FROM subscriptions ORDER BY name COLLATE NOCASE')->fetchAll();
+    if ($kind !== null) {
+        $stmt = $pdo->prepare('SELECT * FROM subscriptions WHERE kind = ? ORDER BY name COLLATE NOCASE');
+        $stmt->execute([$kind]);
+        $subs = $stmt->fetchAll();
+    } else {
+        $subs = $pdo->query('SELECT * FROM subscriptions ORDER BY name COLLATE NOCASE')->fetchAll();
+    }
 
     $pricesStmt = $pdo->prepare('SELECT id, cost, effective_from FROM subscription_prices WHERE subscription_id = ? ORDER BY effective_from ASC, id ASC');
     $freezesStmt = $pdo->prepare('SELECT frozen_from, frozen_until FROM subscription_freezes WHERE subscription_id = ? ORDER BY frozen_from ASC');
@@ -357,10 +363,23 @@ function getAllSubscriptionsWithDetails(PDO $pdo, ?string $today = null): array
 }
 
 /** Όλες οι διακριτές κατηγορίες που υπάρχουν ήδη (για datalist στη φόρμα) */
-function getDistinctCategories(PDO $pdo): array
+function getDistinctCategories(PDO $pdo, ?string $kind = null): array
 {
+    if ($kind !== null) {
+        $stmt = $pdo->prepare('SELECT DISTINCT category FROM subscriptions WHERE kind = ? ORDER BY category COLLATE NOCASE');
+        $stmt->execute([$kind]);
+        return $stmt->fetchAll(PDO::FETCH_COLUMN);
+    }
     return $pdo->query('SELECT DISTINCT category FROM subscriptions ORDER BY category COLLATE NOCASE')
         ->fetchAll(PDO::FETCH_COLUMN);
+}
+
+/** Ρυθμίζει τη γλώσσα μηνυμάτων ("συνδρομή" / "πάγια πληρωμή") ανάλογα με τον τύπο της εγγραφής. */
+function useKindOf(PDO $pdo, int $subscriptionId): void
+{
+    $stmt = $pdo->prepare('SELECT kind FROM subscriptions WHERE id = ?');
+    $stmt->execute([$subscriptionId]);
+    setKind((string) ($stmt->fetchColumn() ?: 'subscription'));
 }
 
 /** Αποθηκεύει μήνυμα (success/danger/warning/info) για εμφάνιση στην επόμενη σελίδα */

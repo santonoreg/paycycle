@@ -20,7 +20,7 @@ function monthLabel(string $ym): string
  *
  * @return array<string,float> κλειδί "Y-m" -> σύνολο ευρώ, σε χρονολογική σειρά
  */
-function computeMonthlySpendHistory(PDO $pdo, int $monthsBack = 12, ?string $today = null): array
+function computeMonthlySpendHistory(PDO $pdo, int $monthsBack = 12, ?string $today = null, ?string $kind = null): array
 {
     $today = $today ?? date('Y-m-d');
     $end = new DateTime($today);
@@ -33,8 +33,11 @@ function computeMonthlySpendHistory(PDO $pdo, int $monthsBack = 12, ?string $tod
         $cursor->modify('+1 month');
     }
 
-    $stmt = $pdo->prepare("SELECT substr(payment_date,1,7) AS ym, SUM(amount) AS total FROM subscription_payments WHERE payment_date >= ? GROUP BY ym");
-    $stmt->execute([$start->format('Y-m-d')]);
+    $sql = "SELECT substr(p.payment_date,1,7) AS ym, SUM(p.amount) AS total
+            FROM subscription_payments p JOIN subscriptions s ON s.id = p.subscription_id
+            WHERE p.payment_date >= ?" . ($kind !== null ? ' AND s.kind = ?' : '') . ' GROUP BY ym';
+    $stmt = $pdo->prepare($sql);
+    $stmt->execute($kind !== null ? [$start->format('Y-m-d'), $kind] : [$start->format('Y-m-d')]);
     foreach ($stmt->fetchAll() as $row) {
         if (isset($buckets[$row['ym']])) {
             $buckets[$row['ym']] = round((float) $row['total'], 2);
@@ -48,12 +51,16 @@ function computeMonthlySpendHistory(PDO $pdo, int $monthsBack = 12, ?string $tod
  * Διαβάζεται απευθείας από το βιβλίο πληρωμών.
  * @return array<string,float> κλειδί έτος -> σύνολο ευρώ
  */
-function computeYearlySpendHistory(PDO $pdo, ?string $today = null): array
+function computeYearlySpendHistory(PDO $pdo, ?string $today = null, ?string $kind = null): array
 {
     $today = $today ?? date('Y-m-d');
     $currentYear = (int) substr($today, 0, 4);
 
-    $minYearRow = $pdo->query('SELECT MIN(substr(payment_date,1,4)) FROM subscription_payments')->fetchColumn();
+    $kindSql = $kind !== null ? ' AND s.kind = ?' : '';
+    $kindArgs = $kind !== null ? [$kind] : [];
+    $minStmt = $pdo->prepare('SELECT MIN(substr(p.payment_date,1,4)) FROM subscription_payments p JOIN subscriptions s ON s.id = p.subscription_id WHERE 1=1' . $kindSql);
+    $minStmt->execute($kindArgs);
+    $minYearRow = $minStmt->fetchColumn();
     $minYear = $minYearRow ? (int) $minYearRow : $currentYear;
 
     $buckets = [];
@@ -61,7 +68,8 @@ function computeYearlySpendHistory(PDO $pdo, ?string $today = null): array
         $buckets[(string) $y] = 0.0;
     }
 
-    $stmt = $pdo->query("SELECT substr(payment_date,1,4) AS y, SUM(amount) AS total FROM subscription_payments GROUP BY y");
+    $stmt = $pdo->prepare('SELECT substr(p.payment_date,1,4) AS y, SUM(p.amount) AS total FROM subscription_payments p JOIN subscriptions s ON s.id = p.subscription_id WHERE 1=1' . $kindSql . ' GROUP BY y');
+    $stmt->execute($kindArgs);
     foreach ($stmt->fetchAll() as $row) {
         if (isset($buckets[$row['y']])) {
             $buckets[$row['y']] = round((float) $row['total'], 2);

@@ -10,6 +10,7 @@ $pdo = getDb();
 $today = date('Y-m-d');
 $details = getAllSubscriptionsWithDetails($pdo, $today);
 
+// --- Κάρτες συνόλων (πάντα για συνδρομές + επαναλαμβανόμενες πληρωμές μαζί) -----
 $activeCount = 0;
 $monthlySum = 0.0;
 $annualSum = 0.0;
@@ -21,51 +22,71 @@ foreach ($details as $d) {
     }
 }
 $avgPerSub = $activeCount > 0 ? $monthlySum / $activeCount : 0.0;
-
-$categoryTotals = computeCategoryTotals($details);
-$freqTotals = computeFrequencyTotals($details);
-$statusCounts = computeStatusCounts($details);
-$monthlyHistory = computeMonthlySpendHistory($pdo, 12, $today);
-$yearlyHistory = computeYearlySpendHistory($pdo, $today);
-$forecastHistory = computeForecastSpend($details, $today);
-$topSubs = computeTopSubscriptions($details, 5);
 $upcoming = computeUpcomingTotals($details, $today);
 
+// --- Δεδομένα ανά "scope": all (σύνολο) / subscription / recurring -----------------
+$scopes = ['all' => null, 'subscription' => 'subscription', 'recurring' => 'recurring'];
 $palette = ['#1B4B66', '#B8842E', '#2F8F5B', '#3E7CB1', '#8B5FBF', '#C0483C', '#4C8FBD', '#6B8E23', '#A6763E', '#5B7A99'];
-$catLabels = array_keys($categoryTotals);
-$catAnnual = array_values(array_map(fn($c) => $c['annual'], $categoryTotals));
-$catMonthly = array_values(array_map(fn($c) => $c['monthly'], $categoryTotals));
-$catColors = [];
-foreach ($catLabels as $i => $c) { $catColors[] = $palette[$i % count($palette)]; }
 
-// Ενιαίο χρονολόγιο: ιστορικό (τελευταίοι 12 μήνες) + πρόβλεψη (μέχρι τέλος
-// επόμενου έτους) σε ένα μόνο γράφημα, με δύο datasets (null όπου δεν ισχύει
-// το καθένα) ώστε να "συνεχίζει" οπτικά με άλλο χρώμα.
-$timelineKeys = array_merge(array_keys($monthlyHistory), array_keys($forecastHistory));
-$timelineLabels = array_map('monthLabel', $timelineKeys);
-$actualValues = [];
-$forecastValues = [];
-foreach ($timelineKeys as $k) {
-    $actualValues[] = array_key_exists($k, $monthlyHistory) ? $monthlyHistory[$k] : null;
-    $forecastValues[] = array_key_exists($k, $forecastHistory) ? $forecastHistory[$k] : null;
+$scopeData = [];
+$freqByScope = [];
+foreach ($scopes as $name => $kind) {
+    $det = $kind === null ? $details : array_values(array_filter($details, fn($d) => $d['sub']['kind'] === $kind));
+
+    $cat = computeCategoryTotals($det);
+    $monthlyHistory = computeMonthlySpendHistory($pdo, 12, $today, $kind);
+    $forecast = computeForecastSpend($det, $today);
+    $yearly = computeYearlySpendHistory($pdo, $today, $kind);
+    $top = computeTopSubscriptions($det, 5);
+
+    $timelineKeys = array_merge(array_keys($monthlyHistory), array_keys($forecast));
+    $actual = [];
+    $fore = [];
+    foreach ($timelineKeys as $k) {
+        $actual[] = array_key_exists($k, $monthlyHistory) ? $monthlyHistory[$k] : null;
+        $fore[] = array_key_exists($k, $forecast) ? $forecast[$k] : null;
+    }
+
+    $catLabels = array_keys($cat);
+    $scopeData[$name] = [
+        'catLabels'   => $catLabels,
+        'catColors'   => array_map(fn($i) => $palette[$i % count($palette)], array_keys($catLabels)),
+        'catAnnual'   => array_values(array_map(fn($c) => $c['annual'], $cat)),
+        'catMonthly'  => array_values(array_map(fn($c) => $c['monthly'], $cat)),
+        'timeline'    => array_map('monthLabel', $timelineKeys),
+        'actual'      => $actual,
+        'forecast'    => $fore,
+        'yearLabels'  => array_keys($yearly),
+        'yearValues'  => array_values($yearly),
+        'topNames'    => array_map(fn($t) => $t['name'], $top),
+        'topValues'   => array_map(fn($t) => $t['annual'], $top),
+    ];
+    $freqByScope[$name] = computeFrequencyTotals($det);
 }
 
-$yearLabels = array_keys($yearlyHistory);
-$yearValues = array_values($yearlyHistory);
+$scopeLabels = ['all' => t('scope.all'), 'subscription' => t('scope.subscription'), 'recurring' => t('scope.recurring')];
 
-$topNames = array_map(fn($t) => $t['name'], $topSubs);
-$topValues = array_map(fn($t) => $t['annual'], $topSubs);
-
-$statusColors = ['active' => '#2F8F5B', 'trial' => '#3E7CB1', 'frozen' => '#4C8FBD', 'canceled' => '#B0483C'];
+/** Καρτέλες (tabs) επιλογής scope για μια κάρτα γραφήματος. */
+function scopeTabs(array $labels): string
+{
+    $out = '<div class="btn-group btn-group-sm scope-tabs" role="group">';
+    $first = true;
+    foreach ($labels as $scope => $label) {
+        $out .= '<button type="button" class="btn btn-outline-secondary' . ($first ? ' active' : '') . '" data-scope="' . $scope . '">'
+            . htmlspecialchars($label) . '</button>';
+        $first = false;
+    }
+    return $out . '</div>';
+}
 
 $pageTitle = t('page.stats');
 require __DIR__ . '/includes/header.php';
 ?>
 
-<div class="row g-3 mb-4">
+<div class="row g-3 mb-1">
   <div class="col-6 col-lg-3">
     <div class="stat-card">
-      <div class="label"><?= te('idx.active_subs') ?></div>
+      <div class="label"><?= te('stats.active_items') ?></div>
       <div class="value num"><?= $activeCount ?></div>
     </div>
   </div>
@@ -88,25 +109,27 @@ require __DIR__ . '/includes/header.php';
     </div>
   </div>
 </div>
+<div class="text-muted small mt-2 mb-4">
+  <?= te('stats.rest_of_month') ?>: <strong class="num"><?= euro($upcoming['rest_of_this_month']) ?></strong> ·
+  <?= te('stats.next_month') ?>: <strong class="num"><?= euro($upcoming['next_month']) ?></strong>
+</div>
 
 <div class="row g-3">
   <div class="col-12 col-lg-6">
-    <div class="card chart-card">
-      <h6><?= te('stats.annual_by_cat') ?></h6>
+    <div class="card chart-card" data-card="donut">
+      <div class="chart-head"><h6><?= te('stats.annual_by_cat') ?></h6><?= scopeTabs($scopeLabels) ?></div>
       <div class="chart-wrap">
-        <canvas id="chartCategoryDonut" role="img" aria-label="<?= te('stats.aria.donut') ?>">
-          <?php foreach ($categoryTotals as $cat => $t): ?><?= htmlspecialchars($cat) ?>: <?= euro($t['annual']) ?>. <?php endforeach; ?>
-        </canvas>
+        <canvas id="chartCategoryDonut" role="img" aria-label="<?= te('stats.aria.donut') ?>"></canvas>
+        <div class="chart-empty d-none"><?= te('stats.no_data') ?></div>
       </div>
     </div>
   </div>
   <div class="col-12 col-lg-6">
-    <div class="card chart-card">
-      <h6><?= te('stats.monthly_by_cat') ?></h6>
+    <div class="card chart-card" data-card="catbar">
+      <div class="chart-head"><h6><?= te('stats.monthly_by_cat') ?></h6><?= scopeTabs($scopeLabels) ?></div>
       <div class="chart-wrap">
-        <canvas id="chartCategoryBar" role="img" aria-label="<?= te('stats.aria.bar_cat') ?>">
-          <?php foreach ($categoryTotals as $cat => $t): ?><?= htmlspecialchars($cat) ?>: <?= euro($t['monthly']) ?>. <?php endforeach; ?>
-        </canvas>
+        <canvas id="chartCategoryBar" role="img" aria-label="<?= te('stats.aria.bar_cat') ?>"></canvas>
+        <div class="chart-empty d-none"><?= te('stats.no_data') ?></div>
       </div>
     </div>
   </div>
@@ -114,59 +137,42 @@ require __DIR__ . '/includes/header.php';
 
 <div class="row g-3 mt-1">
   <div class="col-12 col-lg-7">
-    <div class="card chart-card">
-      <h6><?= te('stats.history_forecast') ?></h6>
+    <div class="card chart-card" data-card="monthly">
+      <div class="chart-head"><h6><?= te('stats.history_forecast') ?></h6><?= scopeTabs($scopeLabels) ?></div>
       <div class="chart-wrap">
-        <canvas id="chartMonthly" role="img" aria-label="<?= te('stats.aria.monthly') ?>">
-          <?php foreach ($monthlyHistory as $ym => $v): ?><?= $ym ?>: <?= euro($v) ?>. <?php endforeach; ?>
-          <?php foreach ($forecastHistory as $ym => $v): ?><?= $ym ?> (<?= te('stats.forecast_suffix') ?>): <?= euro($v) ?>. <?php endforeach; ?>
-        </canvas>
+        <canvas id="chartMonthly" role="img" aria-label="<?= te('stats.aria.monthly') ?>"></canvas>
+        <div class="chart-empty d-none"><?= te('stats.no_data') ?></div>
       </div>
     </div>
   </div>
   <div class="col-12 col-lg-5">
-    <div class="card chart-card">
-      <h6><?= te('stats.per_year') ?></h6>
+    <div class="card chart-card" data-card="yearly">
+      <div class="chart-head"><h6><?= te('stats.per_year') ?></h6><?= scopeTabs($scopeLabels) ?></div>
       <div class="chart-wrap">
-        <canvas id="chartYearly" role="img" aria-label="<?= te('stats.aria.yearly') ?>">
-          <?php foreach ($yearlyHistory as $y => $v): ?><?= $y ?>: <?= euro($v) ?>. <?php endforeach; ?>
-        </canvas>
+        <canvas id="chartYearly" role="img" aria-label="<?= te('stats.aria.yearly') ?>"></canvas>
+        <div class="chart-empty d-none"><?= te('stats.no_data') ?></div>
       </div>
     </div>
   </div>
 </div>
 
 <div class="row g-3 mt-1">
-  <div class="col-12 col-lg-7">
-    <div class="card chart-card">
-      <h6><?= te('stats.top') ?></h6>
-      <div class="chart-wrap" style="height: <?= max(180, count($topSubs) * 45 + 60) ?>px">
-        <canvas id="chartTop" role="img" aria-label="<?= te('stats.aria.top') ?>">
-          <?php foreach ($topSubs as $t): ?><?= htmlspecialchars($t['name']) ?>: <?= euro($t['annual']) ?>. <?php endforeach; ?>
-        </canvas>
-      </div>
-    </div>
-  </div>
-  <div class="col-12 col-lg-5">
-    <div class="card chart-card">
-      <h6><?= te('stats.status_chart') ?></h6>
-      <div class="chart-wrap short">
-        <canvas id="chartStatus" role="img" aria-label="<?= te('stats.aria.status') ?>">
-          <?php foreach ($statusCounts as $s => $c): ?><?= te('status.' . $s) ?>: <?= $c ?>. <?php endforeach; ?>
-        </canvas>
-      </div>
-      <div class="text-center small text-muted mt-2">
-        <?= te('stats.rest_of_month') ?>: <strong class="num"><?= euro($upcoming['rest_of_this_month']) ?></strong> ·
-        <?= te('stats.next_month') ?>: <strong class="num"><?= euro($upcoming['next_month']) ?></strong>
+  <div class="col-12">
+    <div class="card chart-card" data-card="top">
+      <div class="chart-head"><h6><?= te('stats.top') ?></h6><?= scopeTabs($scopeLabels) ?></div>
+      <div class="chart-wrap" style="height: 300px">
+        <canvas id="chartTop" role="img" aria-label="<?= te('stats.aria.top') ?>"></canvas>
+        <div class="chart-empty d-none"><?= te('stats.no_data') ?></div>
       </div>
     </div>
   </div>
 </div>
 
-<div class="section-title"><?= te('stats.totals_by_freq') ?></div>
-<div class="card">
+<div class="card chart-card mt-4" data-card="freq">
+  <div class="chart-head"><h6><?= te('stats.totals_by_freq') ?></h6><?= scopeTabs($scopeLabels) ?></div>
   <div class="table-responsive">
-    <table class="table freq-table mb-0">
+    <?php foreach ($freqByScope as $scope => $freqTotals): ?>
+    <table class="table freq-table mb-0 <?= $scope === 'all' ? '' : 'd-none' ?>" data-scope="<?= $scope ?>">
       <thead>
         <tr><th><?= te('stats.type') ?></th><th class="text-end"><?= te('stats.count') ?></th><th class="text-end"><?= te('stats.monthly_eq') ?></th><th class="text-end"><?= te('stats.annual') ?></th></tr>
       </thead>
@@ -188,11 +194,13 @@ require __DIR__ . '/includes/header.php';
         </tr>
       </tbody>
     </table>
+    <?php endforeach; ?>
   </div>
 </div>
 
 <script src="assets/chart.min.js"></script>
 <script>
+const DATA = <?= json_encode($scopeData, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG) ?>;
 const euroFmt = (v) => '€ ' + Number(v).toLocaleString(<?= json_encode(t('meta.locale')) ?>, {minimumFractionDigits: 2, maximumFractionDigits: 2});
 Chart.defaults.font.family = "-apple-system, 'Segoe UI', Roboto, Arial, sans-serif";
 const cssVar = (n) => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
@@ -200,15 +208,34 @@ Chart.defaults.color = cssVar('--text-muted');
 Chart.defaults.borderColor = cssVar('--border');
 const sliceBorder = cssVar('--surface');
 
-const catLabels = <?= json_encode($catLabels, JSON_UNESCAPED_UNICODE) ?>;
-const catColors = <?= json_encode($catColors) ?>;
+const LBL = {
+  monthlyEq: <?= json_encode(t('stats.dataset.monthly_eq'), JSON_UNESCAPED_UNICODE) ?>,
+  actual: <?= json_encode(t('stats.dataset.actual'), JSON_UNESCAPED_UNICODE) ?>,
+  forecast: <?= json_encode(t('stats.dataset.forecast'), JSON_UNESCAPED_UNICODE) ?>,
+  spending: <?= json_encode(t('stats.dataset.spending'), JSON_UNESCAPED_UNICODE) ?>,
+  annual: <?= json_encode(t('stats.dataset.annual'), JSON_UNESCAPED_UNICODE) ?>,
+};
 
-new Chart(document.getElementById('chartCategoryDonut'), {
+const hasData = (arr) => arr.some((v) => Number(v) > 0);
+const yScale = { y: { beginAtZero: true, ticks: { callback: (v) => euroFmt(v) } } };
+
+// Κάθε κάρτα έχει ΕΝΑ γράφημα· οι καρτέλες αλλάζουν μόνο τα δεδομένα του.
+// apply(chart, data) γεμίζει το γράφημα και επιστρέφει true αν δεν υπάρχουν δεδομένα.
+const cards = {};
+function register(cardKey, canvasId, config, apply) {
+  const chart = new Chart(document.getElementById(canvasId), config);
+  const card = document.querySelector('[data-card="' + cardKey + '"]');
+  cards[cardKey] = function (scope) {
+    const empty = apply(chart, DATA[scope]);
+    chart.update();
+    card.querySelector('.chart-empty').classList.toggle('d-none', !empty);
+  };
+  cards[cardKey]('all');
+}
+
+register('donut', 'chartCategoryDonut', {
   type: 'doughnut',
-  data: {
-    labels: catLabels,
-    datasets: [{ data: <?= json_encode($catAnnual) ?>, backgroundColor: catColors, borderColor: sliceBorder, borderWidth: 2 }]
-  },
+  data: { labels: [], datasets: [{ data: [], backgroundColor: [], borderColor: sliceBorder, borderWidth: 2 }] },
   options: {
     responsive: true, maintainAspectRatio: false,
     plugins: {
@@ -216,28 +243,35 @@ new Chart(document.getElementById('chartCategoryDonut'), {
       tooltip: { callbacks: { label: (ctx) => ctx.label + ': ' + euroFmt(ctx.parsed) } }
     }
   }
+}, (chart, d) => {
+  chart.data.labels = d.catLabels;
+  chart.data.datasets[0].data = d.catAnnual;
+  chart.data.datasets[0].backgroundColor = d.catColors;
+  return !hasData(d.catAnnual);
 });
 
-new Chart(document.getElementById('chartCategoryBar'), {
+register('catbar', 'chartCategoryBar', {
   type: 'bar',
-  data: {
-    labels: catLabels,
-    datasets: [{ label: <?= json_encode(t('stats.dataset.monthly_eq'), JSON_UNESCAPED_UNICODE) ?>, data: <?= json_encode($catMonthly) ?>, backgroundColor: catColors, borderRadius: 4, maxBarThickness: 34 }]
-  },
+  data: { labels: [], datasets: [{ label: LBL.monthlyEq, data: [], backgroundColor: [], borderRadius: 4, maxBarThickness: 34 }] },
   options: {
     responsive: true, maintainAspectRatio: false,
     plugins: { legend: { display: false }, tooltip: { callbacks: { label: (ctx) => euroFmt(ctx.parsed.y) } } },
-    scales: { y: { beginAtZero: true, ticks: { callback: (v) => euroFmt(v) } } }
+    scales: yScale
   }
+}, (chart, d) => {
+  chart.data.labels = d.catLabels;
+  chart.data.datasets[0].data = d.catMonthly;
+  chart.data.datasets[0].backgroundColor = d.catColors;
+  return !hasData(d.catMonthly);
 });
 
-new Chart(document.getElementById('chartMonthly'), {
+register('monthly', 'chartMonthly', {
   type: 'bar',
   data: {
-    labels: <?= json_encode($timelineLabels, JSON_UNESCAPED_UNICODE) ?>,
+    labels: [],
     datasets: [
-      { label: <?= json_encode(t('stats.dataset.actual'), JSON_UNESCAPED_UNICODE) ?>, data: <?= json_encode($actualValues) ?>, backgroundColor: cssVar('--chart-brand'), borderRadius: 4, maxBarThickness: 26 },
-      { label: <?= json_encode(t('stats.dataset.forecast'), JSON_UNESCAPED_UNICODE) ?>, data: <?= json_encode($forecastValues) ?>, backgroundColor: cssVar('--gold'), borderRadius: 4, maxBarThickness: 26 }
+      { label: LBL.actual, data: [], backgroundColor: cssVar('--chart-brand'), borderRadius: 4, maxBarThickness: 26 },
+      { label: LBL.forecast, data: [], backgroundColor: cssVar('--gold'), borderRadius: 4, maxBarThickness: 26 }
     ]
   },
   options: {
@@ -246,51 +280,58 @@ new Chart(document.getElementById('chartMonthly'), {
       legend: { display: true, position: 'bottom', labels: { boxWidth: 12, padding: 12 } },
       tooltip: { callbacks: { label: (ctx) => ctx.dataset.label + ': ' + euroFmt(ctx.parsed.y) } }
     },
-    scales: { y: { beginAtZero: true, ticks: { callback: (v) => euroFmt(v) } }, x: { ticks: { autoSkip: true, maxRotation: 60, minRotation: 45 } } }
+    scales: { y: yScale.y, x: { ticks: { autoSkip: true, maxRotation: 60, minRotation: 45 } } }
   }
+}, (chart, d) => {
+  chart.data.labels = d.timeline;
+  chart.data.datasets[0].data = d.actual;
+  chart.data.datasets[1].data = d.forecast;
+  return !hasData(d.actual) && !hasData(d.forecast);
 });
 
-new Chart(document.getElementById('chartYearly'), {
+register('yearly', 'chartYearly', {
   type: 'bar',
-  data: {
-    labels: <?= json_encode($yearLabels) ?>,
-    datasets: [{ label: <?= json_encode(t('stats.dataset.spending'), JSON_UNESCAPED_UNICODE) ?>, data: <?= json_encode($yearValues) ?>, backgroundColor: cssVar('--gold'), borderRadius: 4, maxBarThickness: 46 }]
-  },
+  data: { labels: [], datasets: [{ label: LBL.spending, data: [], backgroundColor: cssVar('--gold'), borderRadius: 4, maxBarThickness: 46 }] },
   options: {
     responsive: true, maintainAspectRatio: false,
     plugins: { legend: { display: false }, tooltip: { callbacks: { label: (ctx) => euroFmt(ctx.parsed.y) } } },
-    scales: { y: { beginAtZero: true, ticks: { callback: (v) => euroFmt(v) } } }
+    scales: yScale
   }
+}, (chart, d) => {
+  chart.data.labels = d.yearLabels;
+  chart.data.datasets[0].data = d.yearValues;
+  return !hasData(d.yearValues);
 });
 
-new Chart(document.getElementById('chartTop'), {
+register('top', 'chartTop', {
   type: 'bar',
-  data: {
-    labels: <?= json_encode($topNames, JSON_UNESCAPED_UNICODE) ?>,
-    datasets: [{ label: <?= json_encode(t('stats.dataset.annual'), JSON_UNESCAPED_UNICODE) ?>, data: <?= json_encode($topValues) ?>, backgroundColor: cssVar('--trial'), borderRadius: 4 }]
-  },
+  data: { labels: [], datasets: [{ label: LBL.annual, data: [], backgroundColor: cssVar('--trial'), borderRadius: 4 }] },
   options: {
     indexAxis: 'y',
     responsive: true, maintainAspectRatio: false,
     plugins: { legend: { display: false }, tooltip: { callbacks: { label: (ctx) => euroFmt(ctx.parsed.x) } } },
     scales: { x: { beginAtZero: true, ticks: { callback: (v) => euroFmt(v) } } }
   }
+}, (chart, d) => {
+  chart.data.labels = d.topNames;
+  chart.data.datasets[0].data = d.topValues;
+  return !hasData(d.topValues);
 });
 
-new Chart(document.getElementById('chartStatus'), {
-  type: 'doughnut',
-  data: {
-    labels: <?= json_encode(array_map(fn($s) => t('status.' . $s), array_keys($statusCounts)), JSON_UNESCAPED_UNICODE) ?>,
-    datasets: [{
-      data: <?= json_encode(array_values($statusCounts)) ?>,
-      backgroundColor: <?= json_encode(array_values($statusColors)) ?>,
-      borderColor: sliceBorder, borderWidth: 2
-    }]
-  },
-  options: {
-    responsive: true, maintainAspectRatio: false,
-    plugins: { legend: { position: 'bottom', labels: { boxWidth: 12, padding: 10 } } }
-  }
+// Πίνακας συχνοτήτων: εμφανίζεται ο πίνακας του επιλεγμένου scope.
+cards.freq = function (scope) {
+  document.querySelectorAll('[data-card="freq"] table[data-scope]').forEach((tbl) => {
+    tbl.classList.toggle('d-none', tbl.dataset.scope !== scope);
+  });
+};
+
+document.querySelectorAll('.scope-tabs').forEach((group) => {
+  group.addEventListener('click', (e) => {
+    const btn = e.target.closest('button[data-scope]');
+    if (!btn) return;
+    group.querySelectorAll('button').forEach((b) => b.classList.toggle('active', b === btn));
+    cards[group.closest('[data-card]').dataset.card](btn.dataset.scope);
+  });
 });
 </script>
 

@@ -8,7 +8,7 @@ require_once __DIR__ . '/../includes/i18n.php';
 requireLogin();
 
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
-    header('Location: ../index.php');
+    header('Location: ../' . backPage());
     exit;
 }
 verifyCsrf();
@@ -30,11 +30,12 @@ if (!DateTime::createFromFormat('Y-m-d', $startDate)) $errors[] = t('err.invalid
 
 if ($errors) {
     flash('danger', implode(' ', $errors));
-    header('Location: ../index.php');
+    header('Location: ../' . backPage());
     exit;
 }
 
 $pdo = getDb();
+useKindOf($pdo, $id);
 $oldStmt = $pdo->prepare('SELECT * FROM subscriptions WHERE id = ?');
 $oldStmt->execute([$id]);
 $old = $oldStmt->fetch();
@@ -60,7 +61,7 @@ if ($old && $old['status'] !== 'canceled' && ($old['frequency'] !== $frequency |
     } catch (Throwable $e) {
         $pdo->rollBack();
         flash('danger', t('msg.rebuild_error', ['error' => $e->getMessage()]));
-        header('Location: ../index.php');
+        header('Location: ../' . backPage());
         exit;
     }
 }
@@ -71,5 +72,5 @@ if ($stmt->rowCount() === 0) {
     flash('success', t('msg.info_updated') . ($rebuilt ? t('msg.info_rebuilt') : ''));
 }
 
-header('Location: ../index.php');
+header('Location: ../' . backPage());
 exit;
