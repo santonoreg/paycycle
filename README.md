@@ -1,172 +1,159 @@
-# Παρακολούθηση Συνδρομών
+# PayCycle — Subscription Tracker
 
-Εφαρμογή PHP + SQLite για να παρακολουθείς τις προσωπικές σου συνδρομές:
-πότε ξεκίνησαν, πόσες δόσεις έχεις ήδη πληρώσει, πότε είναι η επόμενη και
-πόσο βγαίνει συνολικά τον επόμενο μήνα. Έχει και σελίδα στατιστικών
-(dashboard) με γραφήματα Chart.js.
+A PHP + SQLite app for tracking your personal subscriptions: when they
+started, how many payments you have already made, when the next one is due and
+how much you will pay next month. It also has a statistics dashboard with
+Chart.js charts.
 
-Βασίστηκε στο Excel `Παρακολούθηση Συνδρομών.xlsx` που ήδη κρατούσες.
+It is based on an Excel sheet ("Subscription Tracking.xlsx") that was kept by hand.
+
+The interface is available in **Greek, English and German**, with a light/dark theme.
 
 ---
 
-## 1. Απαιτήσεις
+## 1. Requirements
 
-- PHP 8.1+ με την επέκταση **pdo_sqlite** (σχεδόν πάντα ενεργή by default)
-- Apache2 (ή οποιοσδήποτε server που τρέχει PHP) — δεν χρειάζεται mod_rewrite,
-  δεν υπάρχουν "όμορφα" URLs
-- Τίποτα άλλο. Δεν χρειάζεται Composer, npm, ή build step. Bootstrap 5,
-  Bootstrap Icons και Chart.js φορτώνονται από CDN μέσα στη σελίδα (άρα ο
-  browser του χρήστη χρειάζεται πρόσβαση στο internet για να τα δει σωστά
-  στυλισμένα — ο server σου δεν χρειάζεται).
+- PHP 8.1+ with the **pdo_sqlite** extension (almost always enabled by default)
+- Apache2 (or any server that runs PHP). No mod_rewrite is needed and there are
+  no "pretty" URLs.
+- Nothing else. No Composer, npm or build step. Bootstrap 5, Bootstrap Icons
+  and Chart.js are loaded from a CDN in the page (so the user's browser needs
+  internet access to render the styling — your server does not).
 
-## 2. Εγκατάσταση
+## 2. Installation
 
-1. Αντέγραψε όλο τον φάκελο στον server σου, π.χ.:
+1. Copy the whole folder to your server, e.g.:
    ```
    /var/www/html/subscriptions/
    ```
-2. Δώσε δικαίωμα εγγραφής στον φάκελο `data/` στον χρήστη του Apache (συνήθως
-   `www-data`), ώστε να μπορεί να δημιουργήσει το αρχείο SQLite την πρώτη
-   φορά:
+2. Give the web server user (usually `www-data`) write access to the `data/`
+   folder so it can create the SQLite file the first time:
    ```
    chown -R www-data:www-data /var/www/html/subscriptions/data
    chmod 775 /var/www/html/subscriptions/data
    ```
-3. Άνοιξε τη διεύθυνση στον browser, π.χ. `https://.../subscriptions/`.
-   Η βάση δεδομένων (`data/subscriptions.sqlite`) δημιουργείται αυτόματα με
-   το άδειο schema μόλις φορτωθεί η πρώτη σελίδα — δεν χρειάζεται να τρέξεις
-   τίποτα χειροκίνητα.
+3. Open the address in your browser, e.g. `https://.../subscriptions/`.
+   The database (`data/subscriptions.sqlite`) is created automatically with an
+   empty schema as soon as the first page loads — there is nothing to run by hand.
 
-Δεν υπάρχει καμία δοκιμαστική/δείγμα συνδρομή μέσα — ξεκινάς από άδειο.
+There are no sample subscriptions — you start from an empty list.
 
-## 3. Κωδικός διαχείρισης
+## 3. Admin password
 
-Ο κωδικός **δεν** ορίζεται σε αρχείο. Στο πρώτο άνοιγμα της σελίδας
-**Σύνδεση**, όσο δεν υπάρχει κωδικός, η εφαρμογή σου ζητά να δημιουργήσεις
-έναν (τουλάχιστον 8 χαρακτήρες). Αποθηκεύεται στη βάση δεδομένων μόνο ως
-bcrypt hash, ποτέ σε καθαρό κείμενο. Τον αλλάζεις αργότερα από τη σελίδα
-**Ρυθμίσεις**.
+The password is **not** set in a file. The first time you open the **Login**
+page, while no password exists, the app asks you to create one (at least 8
+characters). It is stored in the database only as a bcrypt hash, never in plain
+text. You can change it later from the **Settings** page.
 
-> Δημιούργησε τον κωδικό αμέσως μετά την εγκατάσταση: όποιος ανοίξει πρώτος
-> τη σελίδα Σύνδεση σε νέα βάση χωρίς κωδικό, ορίζει τον κωδικό.
+> Create the password right after installing: whoever opens the Login page
+> first on a new database with no password sets the password.
 
-Αναβάθμιση από παλιά έκδοση: αν υπάρχει `config.local.php` με
-`APP_PASSWORD_HASH`, το hash εισάγεται αυτόματα στη βάση την πρώτη φορά και
-μετά μπορείς να σβήσεις το αρχείο. Αν χάσεις τον κωδικό, σβήσε τη γραμμή
-`admin_password_hash` από τον πίνακα `app_settings` και θα ζητηθεί νέος.
-Η **προβολή** (λίστα συνδρομών, dashboard στατιστικών) είναι ελεύθερη σε
-όποιον έχει το link — δεν ζητάει κωδικό. Ο κωδικός ζητείται μόνο για
-**διαχείριση**: προσθήκη, επεξεργασία, πάγωμα, ακύρωση, διαγραφή. Αν αυτό
-δεν σε καλύπτει (π.χ. θέλεις να είναι κλειδωμένη η προβολή), πες μου να το
-αλλάξω.
+Upgrading from an old version: if a `config.local.php` file with
+`APP_PASSWORD_HASH` exists, that hash is imported into the database the first
+time, and you can then delete the file. If you lose the password, delete the
+`admin_password_hash` row from the `app_settings` table and a new one will be
+requested.
 
-## 4. Πώς δουλεύει το "βιβλίο πληρωμών"
+**Viewing** (subscription list, statistics dashboard) is open to anyone who
+has the link — no password is required. The password is only needed for
+**management**: adding, editing, freezing, canceling, deleting and changing settings.
 
-Αυτό είναι το πιο σημαντικό κομμάτι της λογικής, οπότε αξίζει να το
-καταλάβεις:
+## 4. How the "payment ledger" works
 
-Κάθε φορά που μια συνδρομή "χρεώνεται" (μηνιαία/ετήσια/κ.λπ.), η εφαρμογή
-**καταχωρεί πραγματική γραμμή** σε έναν πίνακα πληρωμών — δεν υπολογίζει απλά
-"θεωρητικά" κάθε φορά που ανοίγεις τη σελίδα.
+This is the most important part of the logic, so it is worth understanding:
 
-- **Όταν προσθέτεις μια συνδρομή με ημερομηνία έναρξης στο παρελθόν**
-  (π.χ. βάζεις σήμερα μια συνδρομή που στην πραγματικότητα ξεκίνησε πριν 8
-  μήνες), η εφαρμογή **γεμίζει αυτόματα** όλο το ιστορικό — καταχωρεί όλες
-  τις δόσεις που θα είχες πληρώσει μέχρι σήμερα — και υπολογίζει σωστά πότε
-  είναι η επόμενη. Θα δεις ένα μήνυμα του τύπου "Καταχωρήθηκαν αυτόματα 8
-  προηγούμενες δόσεις".
-- **Για συνδρομές που ήδη παρακολουθείς**, κάθε φορά που ανοίγεις την
-  εφαρμογή, ελέγχει αν έχει περάσει η ημερομηνία της επόμενης δόσης από την
-  **τελευταία καταχωρημένη πληρωμή** (όχι από την αρχική ημερομηνία έναρξης)
-  και, αν ναι, την καταχωρεί κι αυτή. Έτσι το ιστορικό χτίζεται σταδιακά,
-  σωστά, χωρίς ποτέ να "ξαναμετράει" από την αρχή.
-- Αν αλλάξεις την τιμή μιας συνδρομής με ημερομηνία ισχύος στο **παρελθόν**
-  (π.χ. "τους πρώτους 3 μήνες ήταν φθηνότερη"), η εφαρμογή διορθώνει
-  αναδρομικά τα ποσά των ήδη καταχωρημένων πληρωμών από εκείνη την ημερομηνία
-  και μετά.
-- Περίοδοι που πέφτουν μέσα σε **πάγωμα** δεν καταχωρούνται ως πληρωμή.
-- Στο modal κάθε συνδρομής (κουμπί με το μολύβι/πληροφορία) υπάρχει tab
-  **"Πληρωμές"** που δείχνει ακριβώς ποιες δόσεις έχουν καταχωρηθεί.
+Every time a subscription is "charged" (monthly/yearly/etc.), the app
+**records a real row** in a payments table — it does not just calculate things
+"theoretically" each time you open the page.
 
-### Πάγωμα vs. Ακύρωση+Επανενεργοποίηση
+- **When you add a subscription with a start date in the past** (e.g. you add
+  today a subscription that actually started 8 months ago), the app **fills in
+  the whole history automatically** — it records all the payments you would have
+  made up to today — and correctly works out when the next one is due. You will
+  see a message like "8 previous payments up to today were recorded automatically".
+- **For subscriptions you already track**, every time you open the app it checks
+  whether the next payment date, counted from the **last recorded payment** (not
+  from the original start date), has passed and, if so, records it too. This way
+  the history is built up gradually and correctly, without ever recounting from
+  the beginning.
+- If you add a price with an effective date in the **past** (e.g. "for the
+  first 3 months it was cheaper"), the app retroactively corrects the amounts of
+  the already recorded payments from that date onward.
+- Periods that fall inside a **freeze** are not recorded as payments.
+- In each subscription's modal (the pencil/info button) there is a **Payments**
+  tab showing exactly which payments have been recorded.
+- If you change a subscription's **frequency or start date**, its recorded
+  payments are recalculated with the new values.
 
-- **Πάγωμα/Ξεπάγωμα**: για προσωρινή διακοπή όπου ξέρεις ότι θα συνεχίσεις
-  (π.χ. σταμάτησες ένα gym app για 2 μήνες). Οι παγωμένοι μήνες εξαιρούνται
-  σωστά από τον υπολογισμό και η επόμενη δόση μετατίθεται ανάλογα.
-- **Ακύρωση/Επανενεργοποίηση**: αν ακυρώσεις και μετά επανενεργοποιήσεις την
-  ίδια συνδρομή, η εφαρμογή καταγράφει αυτόματα το ενδιάμεσο διάστημα σαν
-  "πάγωμα" ώστε να μη δημιουργηθούν πλασματικές πληρωμές για διάστημα που
-  στην πραγματικότητα δεν έτρεχε η συνδρομή.
+### Freeze vs. Cancel + Reactivate
 
-### Γνωστός περιορισμός
+- **Freeze/Unfreeze**: for a temporary pause where you know you will continue
+  (e.g. you stopped a gym app for 2 months). The frozen months are correctly
+  excluded from the calculation and the next payment shifts accordingly.
+- **Cancel/Reactivate**: if you cancel and later reactivate the same
+  subscription, the app automatically records the period in between as a
+  "freeze", so no fictitious payments are created for a period when the
+  subscription was not actually running.
 
-Αν αλλάξεις την **ημερομηνία έναρξης** μιας συνδρομής αφού έχουν ήδη
-καταχωρηθεί πληρωμές (π.χ. διόρθωση τυπογραφικού λάθους), το ήδη
-καταχωρημένο ιστορικό ΔΕΝ ξαναχτίζεται αυτόματα — η αλλαγή επηρεάζει μόνο
-την εμφάνιση. Αν χρειαστεί ποτέ πλήρης επαναδόμηση του ιστορικού μιας
-συγκεκριμένης συνδρομής, πες μου να προσθέσω ένα κουμπί "resync" γι' αυτό.
+## 5. Usage guide
 
-## 5. Οδηγός χρήσης
+- **New subscription**: button at the top right of the main page. Enter the
+  real start date (even if it is old) — the history fills itself in.
+- **Edit / Details**: the pencil button on each row opens a modal with 4 tabs:
+  Details (name/category/frequency/date/notes), Payments (the actual history),
+  Price history (add a new price here when the cost changes), Freezes.
+- **Freeze / Unfreeze / Cancel / Reactivate / Delete**: from the (⋮) menu on
+  each row.
+- **Statistics**: second item in the top menu. Cost by category, 12-month
+  history and forecast, spending per year, most expensive subscriptions,
+  subscription status, totals by frequency.
+- **Filters** on the main page: status, category, search by name.
 
-- **Νέα συνδρομή**: κουμπί πάνω δεξιά στην κύρια σελίδα. Βάλε την
-  πραγματική ημερομηνία έναρξης (ακόμα κι αν είναι παλιά) — το ιστορικό
-  γεμίζει μόνο του.
-- **Επεξεργασία / Λεπτομέρειες**: το κουμπί με το μολύβι σε κάθε γραμμή
-  ανοίγει modal με 4 tabs: Στοιχεία (όνομα/κατηγορία/συχνότητα/ημερομηνία/
-  σημειώσεις), Πληρωμές (το πραγματικό ιστορικό), Ιστορικό τιμών (εκεί
-  προσθέτεις νέα τιμή όταν αλλάζει το κόστος), Παγώματα.
-- **Πάγωμα / Ξεπάγωμα / Ακύρωση / Επανενεργοποίηση / Διαγραφή**: από το
-  μενού (⋮) σε κάθε γραμμή.
-- **Στατιστικά**: πάνω μενού, δεύτερη καρτέλα. Κόστος ανά κατηγορία,
-  μηνιαίο ιστορικό 12 μηνών, έξοδα ανά έτος, ακριβότερες συνδρομές,
-  κατάσταση συνδρομών, σύνολα ανά συχνότητα.
-- **Φίλτρα** στην κύρια σελίδα: κατάσταση, κατηγορία, αναζήτηση με το όνομα.
+## 6. Languages and Settings
 
-## 6. Δομή αρχείων
+- Available languages: **Greek, English, German**. A visitor can switch
+  language from the menu at the top right (this only affects them, via a cookie).
+- The **Settings** page (login required to save) sets, for everyone:
+  the default language, the theme (light / dark / automatic) and the default
+  filter of the subscription list (status and category). The default filter
+  only applies when the list is opened without a filter chosen.
+- To add a language: copy `lang/en.php` to `lang/<code>.php`, translate it and
+  add it to the `SUPPORTED_LANGUAGES` constant in `includes/i18n.php`.
+
+## 7. Database and migrations
+
+- The database `data/subscriptions.sqlite` is created automatically if it does
+  not exist and is **not committed to git** (`.gitignore`).
+- Schema changes are done with migrations (`includes/migrations.php`) that run
+  automatically and never delete data. Before a migration is applied to an
+  existing database, a copy is saved in `data/backups/`.
+
+## 8. File structure
 
 ```
-config.php              ρυθμίσεις (timezone, path βάσης)
-includes/db.php         σύνδεση SQLite (δημιουργεί τη βάση αν λείπει)
-includes/migrations.php migrations schema (με αντίγραφο ασφαλείας πριν την αναβάθμιση)
-includes/i18n.php       πολυγλωσσία t() + ρυθμίσεις (γλώσσα/θέμα/φίλτρα)
-lang/el.php, en.php, de.php  μεταφράσεις
-settings.php             σελίδα ρυθμίσεων
-includes/auth.php       login gate + κωδικός (hash στη βάση) + CSRF
-includes/functions.php  πυρήνας υπολογισμών + το "βιβλίο πληρωμών"
-includes/stats_helpers.php  συγκεντρωτικά στοιχεία για το dashboard
-index.php                κύρια λίστα συνδρομών
-stats.php                dashboard με γραφήματα
+config.php                  settings (timezone, database path)
+includes/db.php             SQLite connection (creates the database if missing)
+includes/migrations.php     schema migrations (with a backup before upgrading)
+includes/i18n.php           translations t() + settings (language/theme/filters)
+includes/auth.php           login gate + password (hash in the database) + CSRF
+includes/functions.php      calculation core + the "payment ledger"
+includes/stats_helpers.php  aggregates for the dashboard
+lang/el.php, en.php, de.php translations
+index.php                   main subscription list
+stats.php                   dashboard with charts
+settings.php                settings page
 login.php / logout.php
-actions/*.php            οι ενέργειες διαχείρισης (POST only, CSRF + login required)
+actions/*.php               management actions (POST only, CSRF + login required)
 assets/style.css, assets/app.js
-data/                     εδώ δημιουργείται αυτόματα το subscriptions.sqlite
+data/                       subscriptions.sqlite is created here automatically
 ```
 
-## 7. Ασφάλεια
+## 9. Security
 
-- Ο κωδικός αποθηκεύεται μόνο ως bcrypt hash στη βάση, ποτέ σε καθαρό κείμενο.
-- Όλες οι φόρμες διαχείρισης προστατεύονται με CSRF token.
-- Όλα τα SQL queries χρησιμοποιούν prepared statements (PDO).
-- Το `data/` περιέχει το SQLite αρχείο σου με όλα τα δεδομένα — βεβαιώσου
-  ότι δεν είναι προσβάσιμο απευθείας από το web αν ο Apache σερβίρει static
-  αρχεία από εκεί (π.χ. πρόσθεσε ένα `.htaccess` με `Require all denied`
-  μέσα στον φάκελο `data/`, ή τοποθέτησέ τον έξω από το document root).
-
-## 8. Πολυγλωσσία και Ρυθμίσεις
-
-- Διαθέσιμες γλώσσες: **Ελληνικά, English, Deutsch**. Ο επισκέπτης μπορεί να αλλάξει
-  γλώσσα από το μενού πάνω δεξιά (αφορά μόνο τον ίδιο, μέσω cookie).
-- Η σελίδα **Ρυθμίσεις** (απαιτεί login για αποθήκευση) ορίζει για όλους:
-  προεπιλεγμένη γλώσσα, θέμα (φωτεινό / σκούρο / αυτόματο) και προεπιλεγμένο
-  φίλτρο της λίστας (κατάσταση και κατηγορία). Το φίλτρο εφαρμόζεται μόνο όταν
-  η λίστα ανοίγει χωρίς επιλεγμένο φίλτρο.
-- Νέα γλώσσα: αντίγραψε το `lang/en.php` σε `lang/<κωδικός>.php`, μετάφρασέ το και
-  πρόσθεσέ τη στη σταθερά `SUPPORTED_LANGUAGES` στο `includes/i18n.php`.
-
-## 9. Βάση δεδομένων και migrations
-
-- Η βάση `data/subscriptions.sqlite` δημιουργείται αυτόματα αν δεν υπάρχει και
-  **δεν ανεβαίνει στο git** (`.gitignore`).
-- Οι αλλαγές schema γίνονται με migrations (`includes/migrations.php`), που
-  τρέχουν αυτόματα και δεν διαγράφουν δεδομένα. Πριν εφαρμοστεί migration σε
-  υπάρχουσα βάση, παίρνεται αντίγραφο στο `data/backups/`.
+- The password is stored only as a bcrypt hash in the database, never in plain text.
+- All management forms are protected with a CSRF token.
+- All SQL queries use prepared statements (PDO).
+- `data/` contains your SQLite file with all your data. It ships with a
+  `.htaccess` that denies direct web access (Apache 2.4+). If your server is
+  not Apache, make sure the folder is not reachable from the web, or place it
+  outside the document root.
