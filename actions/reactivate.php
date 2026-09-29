@@ -37,6 +37,7 @@ try {
             ->execute([$id, $sub['canceled_date'], $today]);
     }
     $pdo->prepare("UPDATE subscriptions SET status='active', canceled_date=NULL, updated_at=datetime('now') WHERE id=?")->execute([$id]);
+    logActivity($pdo, $id, $sub['name'], 'reactivated');
     $pdo->commit();
 } catch (Throwable $e) {
     $pdo->rollBack();

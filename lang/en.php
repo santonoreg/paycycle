@@ -283,4 +283,20 @@ return [
     'users.cannot_delete_last_admin' => 'The last admin cannot be deleted.',
     'users.deleted' => 'User "{name}" deleted.',
     'users.password_reset' => 'Password of user "{name}" changed.',
+
+    // Activity log
+    'tab.activity' => 'History',
+    'js.no_activity' => 'No recorded actions.',
+    'activity.created' => 'Added the subscription',
+    'activity.edited' => 'Edited details',
+    'activity.price_added' => 'New price {cost} from {date}',
+    'activity.price_deleted' => 'Deleted price {cost} (from {date})',
+    'activity.payment_confirmed' => 'Confirmed amount {amount} for the payment of {date}',
+    'activity.frozen' => 'Froze it',
+    'activity.unfrozen' => 'Unfroze it',
+    'activity.canceled' => 'Canceled it',
+    'activity.reactivated' => 'Reactivated it',
+    'activity.deleted' => 'Deleted the subscription',
+    'activity.yes' => 'yes',
+    'activity.no' => 'no',
 ];

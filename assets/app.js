@@ -139,6 +139,22 @@ document.addEventListener('DOMContentLoaded', function () {
           }).join('');
         }
       }
+
+      // Activity log (who did what)
+      var activity = [];
+      try { activity = JSON.parse(d.activity || '[]'); } catch (e) {}
+      var activityList = document.getElementById('activity-list');
+      if (activityList) {
+        if (activity.length === 0) {
+          activityList.innerHTML = '<div class="text-muted small">' + escapeHtml(I18N.js.no_activity) + '</div>';
+        } else {
+          activityList.innerHTML = activity.map(function (a) {
+            return '<div class="entry"><div><i class="bi bi-person"></i> <strong>' + escapeHtml(a.who) + '</strong> ' +
+              '<span class="text-muted small">' + escapeHtml(a.at) + '</span></div>' +
+              '<div class="small">' + escapeHtml(a.text) + '</div></div>';
+          }).join('');
+        }
+      }
     });
   }
 

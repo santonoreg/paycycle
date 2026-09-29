@@ -283,4 +283,20 @@ return [
     'users.cannot_delete_last_admin' => 'Δεν μπορεί να διαγραφεί ο τελευταίος διαχειριστής.',
     'users.deleted' => 'Ο χρήστης «{name}» διαγράφηκε.',
     'users.password_reset' => 'Ο κωδικός του χρήστη «{name}» άλλαξε.',
+
+    // Activity log
+    'tab.activity' => 'Ιστορικό',
+    'js.no_activity' => 'Δεν υπάρχουν καταγεγραμμένες ενέργειες.',
+    'activity.created' => 'Προσθήκη συνδρομής',
+    'activity.edited' => 'Επεξεργασία στοιχείων',
+    'activity.price_added' => 'Νέα τιμή {cost} από {date}',
+    'activity.price_deleted' => 'Διαγραφή τιμής {cost} (από {date})',
+    'activity.payment_confirmed' => 'Επιβεβαίωση ποσού {amount} για τη δόση της {date}',
+    'activity.frozen' => 'Πάγωμα',
+    'activity.unfrozen' => 'Ξεπάγωμα',
+    'activity.canceled' => 'Ακύρωση',
+    'activity.reactivated' => 'Επανενεργοποίηση',
+    'activity.deleted' => 'Διαγραφή συνδρομής',
+    'activity.yes' => 'ναι',
+    'activity.no' => 'όχι',
 ];

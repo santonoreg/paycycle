@@ -68,6 +68,27 @@ function getMigrations(): array
             'name' => 'multi-user: users table + subscriptions.created_by (existing admin password becomes user "admin")',
             'up'   => 'migrateUsers',
         ],
+        7 => [
+            'name' => 'subscription_activity (audit log: who did what, when)',
+            'up'   => function (PDO $pdo): void {
+                // Μόνο νέος πίνακας — δεν αγγίζει καμία υπάρχουσα εγγραφή. Χωρίς foreign keys
+                // ώστε το ιστορικό να μένει και μετά τη διαγραφή συνδρομής ή χρήστη
+                // (κρατούνται τα ονόματα ως snapshot).
+                $pdo->exec("
+                    CREATE TABLE IF NOT EXISTS subscription_activity (
+                        id                INTEGER PRIMARY KEY AUTOINCREMENT,
+                        subscription_id   INTEGER NOT NULL,
+                        subscription_name TEXT NOT NULL,
+                        user_id           INTEGER,
+                        user_name         TEXT,
+                        action            TEXT NOT NULL,
+                        details           TEXT,
+                        created_at        TEXT NOT NULL
+                    )
+                ");
+                $pdo->exec('CREATE INDEX IF NOT EXISTS idx_activity_sub ON subscription_activity(subscription_id, id)');
+            },
+        ],
         4 => [
             'name' => 'subscriptions.total_installments + status paid_off (table rebuild, data preserved)',
             'own_transaction' => true,

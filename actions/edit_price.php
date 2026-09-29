@@ -40,6 +40,7 @@ if ($errors) {
 $stmt = $pdo->prepare('INSERT INTO subscription_prices (subscription_id, cost, effective_from) VALUES (?,?,?)');
 $stmt->execute([$id, (float) $cost, $effectiveFrom]);
 $pdo->prepare("UPDATE subscriptions SET updated_at=datetime('now') WHERE id=?")->execute([$id]);
+logActivity($pdo, $id, (string) $pdo->query('SELECT name FROM subscriptions WHERE id = ' . (int) $id)->fetchColumn(), 'price_added', ['cost' => (float) $cost, 'from' => $effectiveFrom]);
 
 // Η νέα τιμή μπορεί να αφορά ημερομηνία στο παρελθόν (π.χ. "τους πρώτους μήνες
 // είχε χαμηλότερο κόστος") — διόρθωσε αναδρομικά το ποσό των ήδη

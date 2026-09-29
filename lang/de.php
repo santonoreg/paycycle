@@ -272,4 +272,20 @@ return [
     'users.cannot_delete_last_admin' => 'Der letzte Admin kann nicht gelöscht werden.',
     'users.deleted' => 'Benutzer „{name}“ gelöscht.',
     'users.password_reset' => 'Passwort von Benutzer „{name}“ geändert.',
+
+    // Activity log
+    'tab.activity' => 'Verlauf',
+    'js.no_activity' => 'Keine aufgezeichneten Aktionen.',
+    'activity.created' => 'Abo hinzugefügt',
+    'activity.edited' => 'Angaben bearbeitet',
+    'activity.price_added' => 'Neuer Preis {cost} ab {date}',
+    'activity.price_deleted' => 'Preis {cost} gelöscht (ab {date})',
+    'activity.payment_confirmed' => 'Betrag {amount} für die Zahlung vom {date} bestätigt',
+    'activity.frozen' => 'Pausiert',
+    'activity.unfrozen' => 'Fortgesetzt',
+    'activity.canceled' => 'Gekündigt',
+    'activity.reactivated' => 'Reaktiviert',
+    'activity.deleted' => 'Abo gelöscht',
+    'activity.yes' => 'ja',
+    'activity.no' => 'nein',
 ];

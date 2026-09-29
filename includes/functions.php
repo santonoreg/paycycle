@@ -512,3 +512,92 @@ function getDistinctPaymentMethods(PDO $pdo): array
     return $pdo->query("SELECT DISTINCT payment_method FROM subscriptions WHERE payment_method IS NOT NULL AND payment_method != '' ORDER BY payment_method COLLATE NOCASE")
         ->fetchAll(PDO::FETCH_COLUMN);
 }
+
+// --- Ιστορικό ενεργειών (audit log) ------------------------------------------
+
+/**
+ * Καταγράφει ποιος έκανε τι σε μια συνδρομή. Δεν πετά ποτέ exception: αν η
+ * καταγραφή αποτύχει, η ίδια η ενέργεια δεν πρέπει να χαλάσει.
+ *
+ * @param string $action created|edited|price_added|price_deleted|payment_confirmed|frozen|unfrozen|canceled|reactivated|deleted
+ */
+function logActivity(PDO $pdo, int $subId, string $subName, string $action, array $details = []): void
+{
+    try {
+        $u = function_exists('currentUser') ? currentUser() : null;
+        $pdo->prepare('INSERT INTO subscription_activity (subscription_id, subscription_name, user_id, user_name, action, details, created_at) VALUES (?,?,?,?,?,?,?)')
+            ->execute([$subId, $subName, $u['id'] ?? null, $u['username'] ?? null, $action, $details ? json_encode($details, JSON_UNESCAPED_UNICODE) : null, date('Y-m-d H:i:s')]);
+    } catch (Throwable $e) {
+        // η καταγραφή είναι δευτερεύουσα
+    }
+}
+
+/** Ανθρώπινο κείμενο για μια εγγραφή του ιστορικού, στη γλώσσα του επισκέπτη. */
+function activityText(string $action, array $details): string
+{
+    switch ($action) {
+        case 'edited':
+            $parts = [];
+            foreach ($details['changes'] ?? [] as $c) {
+                $parts[] = t('field.' . $c['field']) . ': ' . activityValue($c['field'], $c['old']) . ' → ' . activityValue($c['field'], $c['new']);
+            }
+            return t('activity.edited') . ($parts ? ' — ' . implode('; ', $parts) : '');
+        case 'price_added':
+            return t('activity.price_added', ['cost' => euro((float) $details['cost']), 'date' => fdate($details['from'])]);
+        case 'price_deleted':
+            return t('activity.price_deleted', ['cost' => euro((float) $details['cost']), 'date' => fdate($details['from'])]);
+        case 'payment_confirmed':
+            return t('activity.payment_confirmed', ['amount' => euro((float) $details['amount']), 'date' => fdate($details['date'])]);
+        case 'created':
+        case 'frozen':
+        case 'unfrozen':
+        case 'canceled':
+        case 'reactivated':
+        case 'deleted':
+            return t('activity.' . $action);
+    }
+    return $action;
+}
+
+function activityValue(string $field, $v): string
+{
+    if ($v === null || $v === '') {
+        return '—';
+    }
+    if ($field === 'frequency') {
+        return t('freq.' . $v);
+    }
+    if ($field === 'start_date') {
+        return fdate((string) $v);
+    }
+    if ($field === 'variable_amount') {
+        return $v ? t('activity.yes') : t('activity.no');
+    }
+    if ($field === 'estimate') {
+        return euro((float) $v);
+    }
+    $v = (string) $v;
+    return '"' . (mb_strlen($v) > 60 ? mb_substr($v, 0, 60) . '…' : $v) . '"';
+}
+
+/**
+ * Ιστορικό ανά συνδρομή, έτοιμο για το JSON του παραθύρου λεπτομερειών.
+ * @param int[] $subIds
+ * @return array<int, array<int, array{who:string, at:string, text:string}>> νεότερα πρώτα
+ */
+function getActivityBySubscription(PDO $pdo, array $subIds): array
+{
+    if (!$subIds) {
+        return [];
+    }
+    $in = implode(',', array_map('intval', $subIds));
+    $out = [];
+    foreach ($pdo->query("SELECT * FROM subscription_activity WHERE subscription_id IN ($in) ORDER BY id DESC")->fetchAll() as $r) {
+        $out[(int) $r['subscription_id']][] = [
+            'who'  => $r['user_name'] ?? '—',
+            'at'   => fdate(substr($r['created_at'], 0, 10)) . ' ' . substr($r['created_at'], 11, 5),
+            'text' => activityText($r['action'], $r['details'] ? (json_decode($r['details'], true) ?: []) : []),
+        ];
+    }
+    return $out;
+}

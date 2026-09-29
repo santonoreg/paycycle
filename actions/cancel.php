@@ -40,6 +40,7 @@ syncSubscriptionLedger($pdo, $sub, $prices, $freezes, $today);
 
 $stmt = $pdo->prepare("UPDATE subscriptions SET status='canceled', canceled_date=?, updated_at=datetime('now') WHERE id=?");
 $stmt->execute([$today, $id]);
+logActivity($pdo, $id, $sub['name'], 'canceled');
 
 flash('success', t('msg.sub_canceled', ['name' => $sub['name']]));
 header('Location: ../' . backPage());

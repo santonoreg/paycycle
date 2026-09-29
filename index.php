@@ -14,6 +14,7 @@ $pdo = getDb();
 $today = date('Y-m-d');
 
 $allDetails = getAllSubscriptionsWithDetails($pdo, $today, $kind);
+$activityBySub = getActivityBySubscription($pdo, array_map(fn($d) => (int) $d['sub']['id'], $allDetails));
 $categories = getDistinctCategories($pdo, $kind);
 $paymentMethods = getDistinctPaymentMethods($pdo);
 
@@ -179,6 +180,7 @@ require __DIR__ . '/includes/header.php';
             }
         }
         $freezesJson = htmlspecialchars(json_encode($d['freezes']), ENT_QUOTES);
+        $activityJson = htmlspecialchars(json_encode($activityBySub[(int) $sub['id']] ?? [], JSON_UNESCAPED_UNICODE), ENT_QUOTES);
         $paymentsJson = htmlspecialchars(json_encode(array_map(fn($p) => [
             'amount' => (float) $p['amount'], 'payment_date' => $p['payment_date'], 'is_estimate' => (int) $p['is_estimate'],
         ], $d['payments'])), ENT_QUOTES);
@@ -232,6 +234,7 @@ require __DIR__ . '/includes/header.php';
                 data-current-price="<?= $stats['current_price'] ?>"
                 data-prices='<?= $pricesJson ?>'
                 data-freezes='<?= $freezesJson ?>'
+                data-activity='<?= $activityJson ?>'
                 data-payments='<?= $paymentsJson ?>'
                 title="<?= $loggedIn ? te('title.edit') : te('title.details') ?>">
                 <i class="bi bi-<?= $loggedIn ? 'pencil' : 'info-circle' ?>"></i>
@@ -393,6 +396,7 @@ require __DIR__ . '/includes/header.php';
           <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#tab-payments" type="button"><?= te('tab.payments') ?></button></li>
           <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#tab-prices" type="button"><?= te('tab.prices') ?></button></li>
           <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#tab-freezes" type="button"><?= te('tab.freezes') ?></button></li>
+          <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#tab-activity" type="button"><?= te('tab.activity') ?></button></li>
         </ul>
         <div class="tab-content">
           <!-- Στοιχεία -->
@@ -502,6 +506,10 @@ require __DIR__ . '/includes/header.php';
           <!-- Παγώματα -->
           <div class="tab-pane fade" id="tab-freezes">
             <div class="history-list" id="freezes-list"></div>
+          </div>
+          <!-- Ιστορικό ενεργειών (ποιος έκανε τι) -->
+          <div class="tab-pane fade" id="tab-activity">
+            <div class="history-list" id="activity-list"></div>
           </div>
         </div>
       </div>

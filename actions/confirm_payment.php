@@ -33,6 +33,8 @@ if (!is_numeric($amount) || (float) $amount < 0 || !DateTime::createFromFormat('
     } else {
         refreshEstimates($pdo, $id); // οι υπόλοιπες εκτιμήσεις προσαρμόζονται στον νέο μέσο όρο
         $pdo->prepare("UPDATE subscriptions SET updated_at=datetime('now') WHERE id=?")->execute([$id]);
+        $nm = (string) $pdo->query('SELECT name FROM subscriptions WHERE id = ' . (int) $id)->fetchColumn();
+        logActivity($pdo, $id, $nm, 'payment_confirmed', ['date' => $date, 'amount' => round((float) $amount, 2)]);
         flash('success', t('msg.amount_saved'));
     }
 }

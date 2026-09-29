@@ -27,6 +27,7 @@ if (!$sub) {
     exit;
 }
 
+logActivity($pdo, $id, $sub['name'], 'deleted');
 $pdo->prepare('DELETE FROM subscriptions WHERE id=?')->execute([$id]);
 
 flash('success', t('msg.sub_deleted', ['name' => $sub['name']]));

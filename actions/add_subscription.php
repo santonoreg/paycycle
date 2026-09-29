@@ -66,6 +66,7 @@ try {
     $newPrices = [['cost' => (float) $cost, 'effective_from' => $startDate]];
     $inserted = syncSubscriptionLedger($pdo, $newSub, $newPrices, [], $today);
 
+    logActivity($pdo, (int) $subId, $name, 'created');
     $pdo->commit();
     $msg = t('msg.sub_added', ['name' => $name]);
     if ($inserted > 0) {

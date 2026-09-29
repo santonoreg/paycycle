@@ -32,6 +32,7 @@ $pdo->beginTransaction();
 try {
     $pdo->prepare('INSERT INTO subscription_freezes (subscription_id, frozen_from, frozen_until) VALUES (?,?,NULL)')->execute([$id, $today]);
     $pdo->prepare("UPDATE subscriptions SET status='frozen', updated_at=datetime('now') WHERE id=?")->execute([$id]);
+    logActivity($pdo, $id, $sub['name'], 'frozen');
     $pdo->commit();
     flash('success', t('msg.sub_frozen', ['name' => $sub['name']]));
 } catch (Throwable $e) {

@@ -44,6 +44,8 @@ if ($index === null) {
 } else {
     $pdo->prepare('DELETE FROM subscription_prices WHERE id=? AND subscription_id=?')->execute([$priceId, $subId]);
     $pdo->prepare("UPDATE subscriptions SET updated_at=datetime('now') WHERE id=?")->execute([$subId]);
+    $nm = (string) $pdo->query('SELECT name FROM subscriptions WHERE id = ' . (int) $subId)->fetchColumn();
+    logActivity($pdo, $subId, $nm, 'price_deleted', ['cost' => (float) $prices[$index]['cost'], 'from' => $prices[$index]['effective_from']]);
     flash('success', t('msg.price_deleted'));
 }
 

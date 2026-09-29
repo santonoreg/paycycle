@@ -65,6 +65,30 @@ $oldStmt = $pdo->prepare('SELECT * FROM subscriptions WHERE id = ?');
 $oldStmt->execute([$id]);
 $old = $oldStmt->fetch();
 
+// Τι αλλάζει (για το ιστορικό ενεργειών)
+$changes = [];
+if ($old) {
+    $cmp = ['name' => $name, 'category' => $category, 'frequency' => $frequency, 'payment_method' => $paymentMethod, 'start_date' => $startDate, 'notes' => $notes];
+    if ($setInstallments) {
+        $cmp['installments'] = $installments;
+        $cmp['variable_amount'] = !empty($_POST['variable_amount']) ? 1 : 0;
+    }
+    foreach ($cmp as $field => $new) {
+        $oldVal = $field === 'installments' ? $old['total_installments'] : $old[$field];
+        if ((string) ($oldVal ?? '') !== (string) ($new ?? '')) {
+            $changes[] = ['field' => $field, 'old' => $oldVal, 'new' => $new];
+        }
+    }
+    if ($estimate !== null) {
+        $lastCost = $pdo->prepare('SELECT cost FROM subscription_prices WHERE subscription_id = ? ORDER BY effective_from DESC, id DESC LIMIT 1');
+        $lastCost->execute([$id]);
+        $oldEstimate = $lastCost->fetchColumn();
+        if ($oldEstimate === false || abs((float) $oldEstimate - $estimate) > 0.004) {
+            $changes[] = ['field' => 'estimate', 'old' => $oldEstimate === false ? null : (float) $oldEstimate, 'new' => $estimate];
+        }
+    }
+}
+
 $stmt = $pdo->prepare("UPDATE subscriptions SET name=?, category=?, frequency=?, payment_method=?, start_date=?, notes=?, updated_at=datetime('now') WHERE id=?");
 $stmt->execute([$name, $category, $frequency, $paymentMethod, $startDate, $notes, $id]);
 
@@ -119,6 +143,10 @@ if ($old && $old['status'] !== 'canceled' && ($old['frequency'] !== $frequency |
         header('Location: ../' . backPage());
         exit;
     }
+}
+
+if ($changes) {
+    logActivity($pdo, $id, $name, 'edited', ['changes' => $changes]);
 }
 
 if ($stmt->rowCount() === 0) {

@@ -76,6 +76,11 @@ The app supports **several users and one admin**. Users are stored in the
   (Settings). Every subscription records **who added it** (shown under the
   category in the list and in the details window). If a user is later deleted,
   the subscriptions they added stay, with their name kept as the creator.
+- **History:** every action on a subscription (added, edited with the old and new
+  values, price added/deleted, bill amount confirmed, frozen, unfrozen, canceled,
+  reactivated, deleted) is logged with the user and the time, and is shown in the
+  **History** tab of the details window. The log is kept in the
+  `subscription_activity` table, also after a subscription or user is deleted.
 - **Viewing** (subscription list, statistics dashboard) is open to anyone who
   has the link — no login is required. Login is needed for **management**.
 

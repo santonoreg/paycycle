@@ -43,6 +43,7 @@ try {
         }
     }
     $pdo->prepare("UPDATE subscriptions SET status='active', updated_at=datetime('now') WHERE id=?")->execute([$id]);
+    logActivity($pdo, $id, $sub['name'], 'unfrozen');
     $pdo->commit();
 
     $pricesStmt = $pdo->prepare('SELECT cost, effective_from FROM subscription_prices WHERE subscription_id=? ORDER BY effective_from ASC, id ASC');
