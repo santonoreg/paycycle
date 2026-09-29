@@ -12,7 +12,7 @@ if (!preg_match('#^[a-zA-Z0-9_./?=&%-]+$#', $redirectTo) || str_starts_with($red
 }
 
 $error = null;
-$passwordSet = isPasswordSet();
+$passwordSet = hasUsers();
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     verifyCsrf();
@@ -20,21 +20,23 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     if (!preg_match('#^[a-zA-Z0-9_./?=&%-]+$#', $redirectTo) || str_starts_with($redirectTo, '//')) {
         $redirectTo = 'index.php';
     }
+    $username = trim($_POST['username'] ?? '');
     $password = $_POST['password'] ?? '';
     if (!$passwordSet) {
-        // Πρώτη εγκατάσταση: δημιουργία κωδικού (μόνο όσο δεν υπάρχει κωδικός).
-        $error = validateNewPassword($password, $_POST['password_confirm'] ?? '');
+        // Πρώτη εγκατάσταση: δημιουργία του admin (μόνο όσο δεν υπάρχει κανένας χρήστης).
+        $error = validateUsername($username) ?? validateNewPassword($password, $_POST['password_confirm'] ?? '');
         if ($error === null) {
-            setAdminPassword($password);
-            session_regenerate_id(true);
-            $_SESSION['authenticated'] = true;
+            $id = createUser($username, $password, 'admin');
+            // Συνδρομές που υπήρχαν πριν από τους χρήστες (χωρίς καταχωρητή) αποδίδονται στον πρώτο admin.
+            getDb()->prepare('UPDATE subscriptions SET created_by = ?, created_by_name = ? WHERE created_by IS NULL AND created_by_name IS NULL')
+                ->execute([$id, $username]);
+            loginUser(findUserById($id));
             flash('success', t('setup.done'));
             header('Location: ' . $redirectTo);
             exit;
         }
-    } elseif (verifyAdminPassword($password)) {
-        session_regenerate_id(true);
-        $_SESSION['authenticated'] = true;
+    } elseif ($user = verifyLogin($username, $password)) {
+        loginUser($user);
         header('Location: ' . $redirectTo);
         exit;
     } else {
@@ -59,9 +61,14 @@ require __DIR__ . '/includes/header.php';
           <?= csrfField() ?>
           <input type="hidden" name="redirect_to" value="<?= htmlspecialchars($redirectTo) ?>">
           <div class="mb-3">
+            <label class="form-label"><?= te('login.username') ?></label>
+            <input type="text" name="username" class="form-control" autofocus required autocomplete="username"
+              value="<?= htmlspecialchars($_POST['username'] ?? ($passwordSet ? '' : 'admin')) ?>">
+          </div>
+          <div class="mb-3">
             <label class="form-label"><?= te('login.label') ?></label>
-            <input type="password" name="password" class="form-control" autofocus required
-              <?= $passwordSet ? '' : 'minlength="' . MIN_PASSWORD_LENGTH . '" autocomplete="new-password"' ?>>
+            <input type="password" name="password" class="form-control" required
+              <?= $passwordSet ? '' : 'minlength="' . MIN_PASSWORD_LENGTH . '" autocomplete="new-password"'  ?>>
           </div>
           <?php if (!$passwordSet): ?>
           <div class="mb-3">

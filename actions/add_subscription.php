@@ -53,8 +53,8 @@ $pdo = getDb();
 $today = date('Y-m-d');
 $pdo->beginTransaction();
 try {
-    $stmt = $pdo->prepare('INSERT INTO subscriptions (name, category, frequency, payment_method, start_date, status, notes, kind, total_installments, variable_amount) VALUES (?,?,?,?,?,?,?,?,?,?)');
-    $stmt->execute([$name, $category, $frequency, $paymentMethod, $startDate, $status, $notes, $kind, $installments, $variableAmount]);
+    $stmt = $pdo->prepare('INSERT INTO subscriptions (name, category, frequency, payment_method, start_date, status, notes, kind, total_installments, variable_amount, created_by, created_by_name) VALUES (?,?,?,?,?,?,?,?,?,?,?,?)');
+    $stmt->execute([$name, $category, $frequency, $paymentMethod, $startDate, $status, $notes, $kind, $installments, $variableAmount, currentUser()['id'], currentUser()['username']]);
     $subId = $pdo->lastInsertId();
 
     $stmt2 = $pdo->prepare('INSERT INTO subscription_prices (subscription_id, cost, effective_from) VALUES (?,?,?)');

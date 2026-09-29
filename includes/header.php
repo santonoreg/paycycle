@@ -60,6 +60,13 @@ $backTo = $currentScript . (!empty($_SERVER['QUERY_STRING']) ? '?' . $_SERVER['Q
             <i class="bi bi-bar-chart-line"></i> <?= te('nav.stats') ?>
           </a>
         </li>
+        <?php if (isAdmin()): ?>
+        <li class="nav-item">
+          <a class="nav-link <?= $currentScript === 'users.php' ? 'active' : '' ?>" href="users.php">
+            <i class="bi bi-people"></i> <?= te('nav.users') ?>
+          </a>
+        </li>
+        <?php endif; ?>
         <li class="nav-item">
           <a class="nav-link <?= $currentScript === 'settings.php' ? 'active' : '' ?>" href="settings.php">
             <i class="bi bi-gear"></i> <?= te('nav.settings') ?>
@@ -87,7 +94,7 @@ $backTo = $currentScript . (!empty($_SERVER['QUERY_STRING']) ? '?' . $_SERVER['Q
         <?php if (isLoggedIn()): ?>
           <li class="nav-item d-flex align-items-center">
             <span class="navbar-text text-white-50 me-3 small">
-              <i class="bi bi-unlock"></i> <?= te('nav.logged_in') ?>
+              <i class="bi bi-person-check"></i> <?= htmlspecialchars(currentUser()['username']) ?><?= isAdmin() ? ' <span class="badge text-bg-warning">' . te('role.admin') . '</span>' : '' ?>
             </span>
           </li>
           <li class="nav-item">

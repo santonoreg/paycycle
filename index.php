@@ -186,7 +186,7 @@ require __DIR__ . '/includes/header.php';
         <tr class="<?= $rowClass ?>">
           <td>
             <div class="sub-name"><?= htmlspecialchars($sub['name']) ?></div>
-            <div class="sub-category"><?= htmlspecialchars($sub['category']) ?></div>
+            <div class="sub-category"><?= htmlspecialchars($sub['category']) ?><?php if (!empty($sub['created_by_name'])): ?> · <span title="<?= te('field.added_by') ?>"><i class="bi bi-person"></i> <?= htmlspecialchars($sub['created_by_name']) ?></span><?php endif; ?></div>
           </td>
           <td class="num"><?= $stats['is_variable'] ? '≈ ' : '' ?><?= euro($stats['current_price']) ?><div class="sub-category"><?= te('freq.' . $sub['frequency']) ?><?= $stats['is_variable'] ? ' · ' . te('list.variable') : '' ?></div></td>
           <td class="num"><?= euro($stats['monthly_equivalent']) ?></td>
@@ -224,6 +224,7 @@ require __DIR__ . '/includes/header.php';
                 data-payment-method="<?= htmlspecialchars($sub['payment_method'] ?? '') ?>"
                 data-start-date="<?= $sub['start_date'] ?>"
                 data-notes="<?= htmlspecialchars($sub['notes'] ?? '') ?>"
+                data-added-by="<?= htmlspecialchars($sub['created_by_name'] ?? '') ?>"
                 data-estimate="<?= $fixedEstimate !== null ? number_format($fixedEstimate, 2, '.', '') : '' ?>"
                 data-variable="<?= !empty($sub['variable_amount']) ? 1 : 0 ?>"
                 data-installments="<?= (int) ($sub['total_installments'] ?? 0) ?: '' ?>"
@@ -466,6 +467,7 @@ require __DIR__ . '/includes/header.php';
                 <i class="bi bi-lock"></i> <?= te('btn.login_manage') ?>
               </a>
             <?php endif; ?>
+            <div class="text-muted small mt-3" id="added-by-wrap"><i class="bi bi-person"></i> <?= te('field.added_by') ?>: <span id="added-by"></span></div>
           </div>
           <!-- Πληρωμές (βιβλίο καταχωρημένων δόσεων) -->
           <div class="tab-pane fade" id="tab-payments">

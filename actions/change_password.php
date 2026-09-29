@@ -14,7 +14,7 @@ if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
 verifyCsrf();
 
 $error = null;
-if (!verifyAdminPassword($_POST['current_password'] ?? '')) {
+if (!password_verify($_POST['current_password'] ?? '', currentUser()['password_hash'])) {
     $error = t('pw.wrong_current');
 } else {
     $error = validateNewPassword($_POST['new_password'] ?? '', $_POST['new_password_confirm'] ?? '');
@@ -23,8 +23,8 @@ if (!verifyAdminPassword($_POST['current_password'] ?? '')) {
 if ($error !== null) {
     flash('danger', $error);
 } else {
-    setAdminPassword($_POST['new_password']);
-    session_regenerate_id(true);
+    setUserPassword((int) currentUser()['id'], $_POST['new_password']);
+    loginUser(currentUser());
     flash('success', t('pw.changed'));
 }
 

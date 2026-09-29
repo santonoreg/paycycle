@@ -9,7 +9,8 @@ $pdo = getDb();
 $settings = getSettings();
 $categories = getDistinctCategories($pdo);
 $loggedIn = isLoggedIn();
-$disabled = $loggedIn ? '' : 'disabled';
+$isAdmin = isAdmin();
+$disabled = $isAdmin ? '' : 'disabled';
 
 $pageTitle = t('page.settings');
 require __DIR__ . '/includes/header.php';
@@ -25,6 +26,8 @@ require __DIR__ . '/includes/header.php';
         <span><i class="bi bi-lock"></i> <?= te('settings.login_needed') ?></span>
         <a class="btn btn-sm btn-primary" href="<?= htmlspecialchars(loginUrl('settings.php')) ?>"><?= te('nav.login') ?></a>
       </div>
+    <?php elseif (!$isAdmin): ?>
+      <div class="alert alert-info"><i class="bi bi-info-circle"></i> <?= te('settings.admin_only') ?></div>
     <?php endif; ?>
 
     <form method="post" action="actions/save_settings.php" class="card p-3 p-md-4">

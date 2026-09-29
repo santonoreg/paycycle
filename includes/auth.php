@@ -3,42 +3,68 @@
  * auth.php
  * Η προβολή (λίστα, dashboard) είναι ελεύθερη σε όλους.
  * Οι ενέργειες διαχείρισης (προσθήκη/επεξεργασία/πάγωμα/ακύρωση/διαγραφή)
- * απαιτούν να έχει γίνει login.
+ * απαιτούν να έχει γίνει login. Υπάρχουν χρήστες (πίνακας users) με ρόλο
+ * 'admin' ή 'user'· μόνο ο admin προσθαφαιρεί χρήστες και αλλάζει τις ρυθμίσεις.
  */
 
 require_once __DIR__ . '/i18n.php';
 
 const MIN_PASSWORD_LENGTH = 8;
 
-/**
- * Το hash του κωδικού διαχείρισης από τη βάση ('' αν δεν έχει οριστεί).
- * Αν λείπει από τη βάση αλλά υπάρχει παλιό APP_PASSWORD_HASH (config.local.php
- * από προηγούμενη έκδοση), εισάγεται εδώ μία φορά.
- */
-function adminPasswordHash(): string
+function hasUsers(): bool
 {
-    $hash = getSetting('admin_password_hash');
-    if ($hash === '' && defined('APP_PASSWORD_HASH') && APP_PASSWORD_HASH !== '') {
-        saveSettings(getDb(), ['admin_password_hash' => APP_PASSWORD_HASH]);
-        $hash = APP_PASSWORD_HASH;
+    return (int) getDb()->query('SELECT COUNT(*) FROM users')->fetchColumn() > 0;
+}
+
+/** @return array{id:int,username:string,password_hash:string,role:string}|null */
+function findUserByUsername(string $username): ?array
+{
+    $stmt = getDb()->prepare('SELECT * FROM users WHERE username = ?');
+    $stmt->execute([$username]);
+    return $stmt->fetch() ?: null;
+}
+
+/** @return array{id:int,username:string,password_hash:string,role:string}|null */
+function findUserById(int $id): ?array
+{
+    $stmt = getDb()->prepare('SELECT * FROM users WHERE id = ?');
+    $stmt->execute([$id]);
+    return $stmt->fetch() ?: null;
+}
+
+/** Επαληθεύει username + κωδικό. Επιστρέφει τον χρήστη ή null. */
+function verifyLogin(string $username, string $password): ?array
+{
+    $user = findUserByUsername(trim($username));
+    if ($user === null) {
+        // Ίδιος χρόνος απάντησης είτε υπάρχει ο χρήστης είτε όχι.
+        password_verify($password, '$2y$12$qMr/zM4PmPYhSyiVHVCCQOVgQfDqy5kj1fq9GhSreESZOJ0YVKJ12');
+        return null;
     }
-    return $hash;
+    return password_verify($password, $user['password_hash']) ? $user : null;
 }
 
-function isPasswordSet(): bool
+function validateUsername(string $username): ?string
 {
-    return adminPasswordHash() !== '';
+    if (!preg_match('/^[A-Za-z0-9_.-]{3,32}$/', $username)) {
+        return t('user.invalid_name');
+    }
+    return null;
 }
 
-function verifyAdminPassword(string $password): bool
+/** @return int το id του νέου χρήστη */
+function createUser(string $username, string $password, string $role = 'user'): int
 {
-    $hash = adminPasswordHash();
-    return $hash !== '' && password_verify($password, $hash);
+    $pdo = getDb();
+    $pdo->prepare('INSERT INTO users (username, password_hash, role) VALUES (?, ?, ?)')
+        ->execute([$username, password_hash($password, PASSWORD_DEFAULT), $role === 'admin' ? 'admin' : 'user']);
+    return (int) $pdo->lastInsertId();
 }
 
-function setAdminPassword(string $password): void
+function setUserPassword(int $userId, string $password): void
 {
-    saveSettings(getDb(), ['admin_password_hash' => password_hash($password, PASSWORD_DEFAULT)]);
+    getDb()->prepare('UPDATE users SET password_hash = ? WHERE id = ?')
+        ->execute([password_hash($password, PASSWORD_DEFAULT), $userId]);
 }
 
 /** @return string|null μήνυμα σφάλματος, ή null αν ο νέος κωδικός είναι έγκυρος */
@@ -53,9 +79,31 @@ function validateNewPassword(string $password, string $confirm): ?string
     return null;
 }
 
+/** Ο συνδεδεμένος χρήστης, ή null. Ελέγχεται σε κάθε αίτημα, ώστε ένας χρήστης που διαγράφηκε να αποσυνδέεται αμέσως. */
+function currentUser(): ?array
+{
+    static $user = false;
+    if ($user === false) {
+        $user = !empty($_SESSION['user_id']) ? findUserById((int) $_SESSION['user_id']) : null;
+    }
+    return $user;
+}
+
+function loginUser(array $user): void
+{
+    session_regenerate_id(true);
+    $_SESSION['user_id'] = (int) $user['id'];
+}
+
 function isLoggedIn(): bool
 {
-    return !empty($_SESSION['authenticated']) && $_SESSION['authenticated'] === true;
+    return currentUser() !== null;
+}
+
+function isAdmin(): bool
+{
+    $u = currentUser();
+    return $u !== null && $u['role'] === 'admin';
 }
 
 /**
@@ -69,6 +117,16 @@ function requireLogin(): void
         $back = $_SERVER['HTTP_REFERER'] ?? 'index.php';
         header('Location: ' . loginUrl($back));
         exit;
+    }
+}
+
+/** Ενέργειες μόνο για τον admin (διαχείριση χρηστών, γενικές ρυθμίσεις). */
+function requireAdmin(): void
+{
+    requireLogin();
+    if (!isAdmin()) {
+        http_response_code(403);
+        die(htmlspecialchars(t('err.admin_only')));
     }
 }
 

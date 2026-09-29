@@ -58,25 +58,37 @@ _All screenshots use made-up demo data._
 
 There are no sample subscriptions — you start from an empty list.
 
-## 3. Admin password
+## 3. Users and the admin
 
-The password is **not** set in a file. The first time you open the **Login**
-page, while no password exists, the app asks you to create one (at least 8
-characters). It is stored in the database only as a bcrypt hash, never in plain
-text. You can change it later from the **Settings** page.
+The app supports **several users and one admin**. Users are stored in the
+`users` table with a bcrypt password hash (never plain text).
 
-> Create the password right after installing: whoever opens the Login page
-> first on a new database with no password sets the password.
+- **First run:** the first time you open the **Login** page, while no user
+  exists, the app asks you to create the **admin** (username + password of at
+  least 8 characters).
 
-Upgrading from an old version: if a `config.local.php` file with
-`APP_PASSWORD_HASH` exists, that hash is imported into the database the first
-time, and you can then delete the file. If you lose the password, delete the
-`admin_password_hash` row from the `app_settings` table and a new one will be
-requested.
+  > Do this right after installing: whoever opens the Login page first on a new
+  > database creates the admin.
+- **Admin:** the only one who can add and remove users (menu **Users**), reset
+  a user's password and change the global **Settings**. The last admin and your
+  own account cannot be deleted.
+- **Users:** can add and manage subscriptions, and change their own password
+  (Settings). Every subscription records **who added it** (shown under the
+  category in the list and in the details window). If a user is later deleted,
+  the subscriptions they added stay, with their name kept as the creator.
+- **Viewing** (subscription list, statistics dashboard) is open to anyone who
+  has the link — no login is required. Login is needed for **management**.
 
-**Viewing** (subscription list, statistics dashboard) is open to anyone who
-has the link — no password is required. The password is only needed for
-**management**: adding, editing, freezing, canceling, deleting and changing settings.
+**Upgrading from a single-password version:** the migration (run automatically,
+with a backup of the database in `data/backups/`) turns the existing admin
+password — from the database or from an old `config.local.php` with
+`APP_PASSWORD_HASH` — into the user **`admin`** with the same password, and
+attributes all existing subscriptions to it. If no password had ever been set,
+no user is created and the first-run screen above appears; the existing
+subscriptions are then attributed to the admin you create. No data is lost.
+If you lose the admin password, delete the row of that admin from the `users`
+table (e.g. `sqlite3 data/subscriptions.sqlite "DELETE FROM users WHERE role='admin'"`)
+and the first-run screen appears again.
 
 ## 4. How the "payment ledger" works
 
@@ -152,7 +164,7 @@ Every time a subscription is "charged" (monthly/yearly/etc.), the app
 
 - Available languages: **Greek, English, German**. A visitor can switch
   language from the menu at the top right (this only affects them, via a cookie).
-- The **Settings** page (login required to save) sets, for everyone:
+- The **Settings** page (admin only to save) sets, for everyone:
   the default language, the theme (light / dark / automatic) and the default
   filter of the subscription list (status and category). The default filter
   only applies when the list is opened without a filter chosen.
@@ -174,14 +186,15 @@ config.php                  settings (timezone, database path)
 includes/db.php             SQLite connection (creates the database if missing)
 includes/migrations.php     schema migrations (with a backup before upgrading)
 includes/i18n.php           translations t() + settings (language/theme/filters)
-includes/auth.php           login gate + password (hash in the database) + CSRF
+includes/auth.php           users, login, roles (admin/user) + CSRF
 includes/functions.php      calculation core + the "payment ledger"
 includes/stats_helpers.php  aggregates for the dashboard
 lang/el.php, en.php, de.php translations
 index.php                   main subscription list
 recurring.php               recurring payments list (same view, kind = recurring)
 stats.php                   dashboard with charts
-settings.php                settings page
+settings.php                settings page (+ change own password)
+users.php                   user management (admin only)
 login.php / logout.php
 actions/*.php               management actions (POST only, CSRF + login required)
 assets/style.css, assets/app.js
@@ -190,7 +203,8 @@ data/                       subscriptions.sqlite is created here automatically
 
 ## 9. Security
 
-- The password is stored only as a bcrypt hash in the database, never in plain text.
+- Passwords are stored only as bcrypt hashes in the database, never in plain text.
+- User management and global settings are restricted to the admin on the server side; a deleted user is logged out immediately.
 - All management forms are protected with a CSRF token.
 - All SQL queries use prepared statements (PDO).
 - `data/` contains your SQLite file with all your data. It ships with a

@@ -64,12 +64,58 @@ function getMigrations(): array
                 }
             },
         ],
+        6 => [
+            'name' => 'multi-user: users table + subscriptions.created_by (existing admin password becomes user "admin")',
+            'up'   => 'migrateUsers',
+        ],
         4 => [
             'name' => 'subscriptions.total_installments + status paid_off (table rebuild, data preserved)',
             'own_transaction' => true,
             'up'   => 'migrateInstallmentsAndPaidOff',
         ],
     ];
+}
+
+/**
+ * Πολλαπλοί χρήστες. Ο μοναδικός κωδικός διαχείρισης που υπήρχε (app_settings ή
+ * το παλιό config.local.php) γίνεται ο χρήστης "admin" με ρόλο admin, ώστε να
+ * συνεχίσει να μπαίνει με τον ίδιο κωδικό. Όλες οι υπάρχουσες συνδρομές
+ * αποδίδονται σε αυτόν. Αν δεν είχε οριστεί ποτέ κωδικός, δεν δημιουργείται
+ * χρήστης — ο πρώτος admin φτιάχνεται από τη σελίδα Σύνδεσης.
+ */
+function migrateUsers(PDO $pdo): void
+{
+    $pdo->exec("
+        CREATE TABLE IF NOT EXISTS users (
+            id            INTEGER PRIMARY KEY AUTOINCREMENT,
+            username      TEXT NOT NULL UNIQUE COLLATE NOCASE,
+            password_hash TEXT NOT NULL,
+            role          TEXT NOT NULL DEFAULT 'user' CHECK(role IN ('admin','user')),
+            created_at    TEXT NOT NULL DEFAULT (datetime('now'))
+        )
+    ");
+
+    // created_by: ο χρήστης που πρόσθεσε τη συνδρομή. Το created_by_name κρατά το
+    // όνομα όπως ήταν, ώστε η καταγραφή να μένει και μετά τη διαγραφή του χρήστη.
+    $cols = array_column($pdo->query('PRAGMA table_info(subscriptions)')->fetchAll(), 'name');
+    if (!in_array('created_by', $cols, true)) {
+        $pdo->exec('ALTER TABLE subscriptions ADD COLUMN created_by INTEGER REFERENCES users(id) ON DELETE SET NULL');
+    }
+    if (!in_array('created_by_name', $cols, true)) {
+        $pdo->exec('ALTER TABLE subscriptions ADD COLUMN created_by_name TEXT');
+    }
+
+    $stmt = $pdo->prepare("SELECT value FROM app_settings WHERE key = 'admin_password_hash'");
+    $stmt->execute();
+    $hash = (string) $stmt->fetchColumn();
+    if ($hash === '' && defined('APP_PASSWORD_HASH')) {
+        $hash = (string) APP_PASSWORD_HASH;
+    }
+    if ($hash !== '' && (int) $pdo->query('SELECT COUNT(*) FROM users')->fetchColumn() === 0) {
+        $pdo->prepare("INSERT INTO users (username, password_hash, role) VALUES ('admin', ?, 'admin')")->execute([$hash]);
+        $adminId = (int) $pdo->lastInsertId();
+        $pdo->prepare("UPDATE subscriptions SET created_by = ?, created_by_name = 'admin' WHERE created_by IS NULL")->execute([$adminId]);
+    }
 }
 
 /**

@@ -54,6 +54,7 @@ document.addEventListener('DOMContentLoaded', function () {
       setText('ro-start-date', fmtDate(d.startDate));
       setText('ro-notes', d.notes || '—');
       setText('ro-installments', d.installments || '—');
+      setText('added-by', d.addedBy || '—');
 
       // Payments ledger
       var payments = [];
