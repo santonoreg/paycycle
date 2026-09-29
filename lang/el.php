@@ -285,7 +285,7 @@ return [
     'users.password_reset' => 'Ο κωδικός του χρήστη «{name}» άλλαξε.',
 
     // Activity log
-    'tab.activity' => 'Ιστορικό',
+    'tab.activity' => 'Αλλαγές',
     'js.no_activity' => 'Δεν υπάρχουν καταγεγραμμένες ενέργειες.',
     'activity.created' => 'Προσθήκη συνδρομής',
     'activity.edited' => 'Επεξεργασία στοιχείων',

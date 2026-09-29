@@ -285,7 +285,7 @@ return [
     'users.password_reset' => 'Password of user "{name}" changed.',
 
     // Activity log
-    'tab.activity' => 'History',
+    'tab.activity' => 'Changes',
     'js.no_activity' => 'No recorded actions.',
     'activity.created' => 'Added the subscription',
     'activity.edited' => 'Edited details',
