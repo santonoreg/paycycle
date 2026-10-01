@@ -11,6 +11,8 @@ if (!in_array($themePref, THEMES, true)) {
     $themePref = 'light';
 }
 $initialTheme = $themePref === 'dark' ? 'dark' : 'light';
+// Διάταξη (πλήρες πλάτος / περιορισμένο): προτίμηση του επισκέπτη, αποθηκεύεται σε cookie
+$layout = ($_COOKIE['layout'] ?? 'full') === 'boxed' ? 'boxed' : 'full';
 $backTo = $currentScript . (!empty($_SERVER['QUERY_STRING']) ? '?' . $_SERVER['QUERY_STRING'] : '');
 ?>
 <!DOCTYPE html>
@@ -34,7 +36,7 @@ $backTo = $currentScript . (!empty($_SERVER['QUERY_STRING']) ? '?' . $_SERVER['Q
 <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" rel="stylesheet">
 <link href="assets/style.css?v=<?= filemtime(__DIR__ . '/../assets/style.css') ?>" rel="stylesheet">
 </head>
-<body>
+<body class="layout-<?= $layout ?>">
 <nav class="navbar navbar-expand-lg navbar-dark app-navbar mb-4">
   <div class="container-fluid">
     <a class="navbar-brand fw-semibold" href="index.php">
@@ -74,6 +76,12 @@ $backTo = $currentScript . (!empty($_SERVER['QUERY_STRING']) ? '?' . $_SERVER['Q
         </li>
       </ul>
       <ul class="navbar-nav align-items-lg-center">
+        <li class="nav-item me-lg-2 my-2 my-lg-0">
+          <div class="btn-group btn-group-sm layout-toggle" role="group" aria-label="<?= te('nav.layout') ?>" data-base="<?= htmlspecialchars(appBasePath()) ?>">
+            <button type="button" class="btn btn-outline-light <?= $layout === 'full' ? 'active' : '' ?>" data-layout="full" title="<?= te('nav.layout_full') ?>" aria-pressed="<?= $layout === 'full' ? 'true' : 'false' ?>"><i class="bi bi-arrows-fullscreen"></i></button>
+            <button type="button" class="btn btn-outline-light <?= $layout === 'boxed' ? 'active' : '' ?>" data-layout="boxed" title="<?= te('nav.layout_boxed') ?>" aria-pressed="<?= $layout === 'boxed' ? 'true' : 'false' ?>"><i class="bi bi-fullscreen-exit"></i></button>
+          </div>
+        </li>
         <li class="nav-item dropdown me-lg-2">
           <a class="nav-link dropdown-toggle" href="#" data-bs-toggle="dropdown" title="<?= te('nav.language') ?>">
             <i class="bi bi-translate"></i> <?= htmlspecialchars(strtoupper(currentLang())) ?>

@@ -74,6 +74,26 @@ document.addEventListener('DOMContentLoaded', function () {
     pm.addEventListener('change', function () { syncPm(pm.parentNode); });
   });
 
+
+  // --- Διάταξη: πλήρες πλάτος / περιορισμένο (cookie, ισχύει αμέσως χωρίς reload) ---
+  var layoutToggle = document.querySelector('.layout-toggle');
+  if (layoutToggle) {
+    layoutToggle.querySelectorAll('[data-layout]').forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        var mode = btn.getAttribute('data-layout');
+        document.body.classList.toggle('layout-boxed', mode === 'boxed');
+        document.body.classList.toggle('layout-full', mode !== 'boxed');
+        layoutToggle.querySelectorAll('[data-layout]').forEach(function (b) {
+          var on = b === btn;
+          b.classList.toggle('active', on);
+          b.setAttribute('aria-pressed', on ? 'true' : 'false');
+        });
+        document.cookie = 'layout=' + mode + '; path=' + (layoutToggle.getAttribute('data-base') || '/') + '; max-age=31536000; SameSite=Lax';
+        window.dispatchEvent(new Event('resize')); // τα γραφήματα προσαρμόζονται στο νέο πλάτος
+      });
+    });
+  }
+
   // --- Μηνύματα (toast): εμφανίζονται και εξαφανίζονται μόνα τους ---
   document.querySelectorAll('.toast-container .toast').forEach(function (el) {
     bootstrap.Toast.getOrCreateInstance(el).show();

@@ -300,3 +300,7 @@ a { color: var(--brand); }
 .tag-subscription { background: var(--brand-tint); color: var(--brand-dark); }
 .tag-recurring    { background: var(--gold-tint);  color: var(--gold); }
 .tag-category     { background: var(--surface-2);  color: var(--text-muted); border-color: var(--border); }
+
+/* ---- Διάταξη: πλήρες πλάτος (προεπιλογή) ή περιορισμένο ("boxed") ---- */
+.layout-boxed .container-fluid { max-width: 1200px; margin-left: auto; margin-right: auto; }
+.layout-toggle .btn.active { background: rgba(255, 255, 255, 0.9); color: var(--brand-dark); border-color: transparent; }

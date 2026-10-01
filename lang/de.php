@@ -345,4 +345,9 @@ return [
     'cards.deleted' => 'Karte „{name}“ gelöscht.',
     'cards.in_use' => 'Die Karte „{name}“ wird in {n} Zahlungen verwendet. Ändere zuerst deren Zahlungsart.',
     'cards.not_found' => 'Karte nicht gefunden.',
+
+    // Layout
+    'nav.layout' => 'Seitenlayout',
+    'nav.layout_full' => 'Volle Breite',
+    'nav.layout_boxed' => 'Begrenzte Breite',
 ];

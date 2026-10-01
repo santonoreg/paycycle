@@ -356,4 +356,9 @@ return [
     'cards.deleted' => 'Card "{name}" deleted.',
     'cards.in_use' => 'The card "{name}" is used by {n} payments. Change their payment method first.',
     'cards.not_found' => 'Card not found.',
+
+    // Layout
+    'nav.layout' => 'Page layout',
+    'nav.layout_full' => 'Full width',
+    'nav.layout_boxed' => 'Boxed',
 ];
