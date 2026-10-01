@@ -22,6 +22,25 @@ document.addEventListener('DOMContentLoaded', function () {
     return '€ ' + parts.join('.');
   }
 
+
+  // Πεδία που αφορούν μόνο επαναλαμβανόμενες πληρωμές (δόσεις, μεταβλητό ποσό):
+  // κρύβονται ΚΑΙ απενεργοποιούνται για συνδρομές, ώστε να μην αποστέλλονται.
+  function applyKind(root, kind) {
+    if (!root) return;
+    root.querySelectorAll('.rec-only').forEach(function (el) {
+      var on = kind === 'recurring';
+      el.classList.toggle('d-none', !on);
+      el.querySelectorAll('input, select, textarea').forEach(function (i) { i.disabled = !on; });
+    });
+  }
+
+  var addKind = document.getElementById('add-kind');
+  if (addKind) {
+    var addForm = addKind.closest('form');
+    addKind.addEventListener('change', function () { applyKind(addForm, addKind.value); });
+    applyKind(addForm, addKind.value);
+  }
+
   var detailsModal = document.getElementById('detailsModal');
   if (detailsModal) {
     detailsModal.addEventListener('show.bs.modal', function (event) {
@@ -41,6 +60,7 @@ document.addEventListener('DOMContentLoaded', function () {
       setVal('edit-start-date', d.startDate);
       setVal('edit-notes', d.notes);
       setVal('edit-installments', d.installments);
+      applyKind(detailsModal, d.kind);
       var editVariable = document.getElementById('edit-variable');
       if (editVariable) editVariable.checked = d.variable === '1';
       setVal('edit-estimate', d.estimate);

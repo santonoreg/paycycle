@@ -147,7 +147,7 @@ function csrfToken(): string
 }
 
 /** Σελίδες λίστας στις οποίες επιστρέφουν οι ενέργειες μετά την ολοκλήρωση. */
-const LIST_PAGES = ['index.php', 'recurring.php'];
+const LIST_PAGES = ['index.php'];
 
 /** Η σελίδα λίστας στην οποία γυρίζει ο χρήστης μετά από μια ενέργεια (whitelist). */
 function backPage(): string

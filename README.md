@@ -145,11 +145,14 @@ Every time a subscription is "charged" (monthly/yearly/etc.), the app
   year, most expensive items and totals by frequency. The summary cards and each
   chart show subscriptions and recurring payments **together** by default; every
   chart card has tabs to view **Subscriptions** or **Recurring payments** only.
-- **Filters** on the main page: status, category, search by name.
-- **Recurring payments** (menu item next to Subscriptions): the same list for
-  everything else that repeats — loans, installments for purchases, phones,
-  insurance, etc. They work exactly like subscriptions (same frequencies, price
-  history, freezes, payment ledger) and have their own categories.
+- **Filters** on the **Payments** screen: type, status, category, search by name.
+- **One screen for everything that repeats.** The **Payments** screen lists both
+  **subscriptions** and **recurring payments** (loans, installments for purchases,
+  phones, insurance, etc.). Use the tabs All / Subscriptions / Recurring payments
+  to narrow the list; the cards at the top follow the selected tab. When you add a
+  payment you choose its **Type**, and the form adapts (installments and
+  "variable amount" only exist for recurring payments). Both types work exactly
+  the same way (same frequencies, price history, freezes, payment ledger).
   A recurring payment can have an optional **number of installments** (e.g. a
   12-month loan). The list then shows `paid / total` with the remaining count,
   the forecast stops after the last installment, and once the last installment
@@ -195,8 +198,8 @@ includes/auth.php           users, login, roles (admin/user) + CSRF
 includes/functions.php      calculation core + the "payment ledger"
 includes/stats_helpers.php  aggregates for the dashboard
 lang/el.php, en.php, de.php translations
-index.php                   main subscription list
-recurring.php               recurring payments list (same view, kind = recurring)
+index.php                   the "Payments" screen: subscriptions + recurring payments
+recurring.php               redirects old links to index.php?type=recurring
 stats.php                   dashboard with charts
 settings.php                settings page (+ change own password)
 users.php                   user management (admin only)

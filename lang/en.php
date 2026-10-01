@@ -31,7 +31,7 @@ return [
     'page.settings'      => 'Settings',
 
     // Navigation / layout
-    'nav.subscriptions' => 'Subscriptions',
+    'nav.subscriptions' => 'Payments',
     'nav.stats'         => 'Statistics',
     'nav.settings'      => 'Settings',
     'nav.logged_in'     => 'Logged in',
@@ -213,14 +213,14 @@ return [
     'scope.recurring' => 'Recurring payments',
     'stats.no_data' => 'No data yet',
     'stats.active_items' => 'Active subscriptions & recurring payments',
-    'page.subscriptions@rec' => 'Recurring payments',
+    'page.subscriptions@rec' => 'Payments',
     'idx.active_subs@rec' => 'Active recurring payments',
-    'btn.new_sub@rec' => 'New recurring payment',
-    'modal.new_sub@rec' => 'New recurring payment',
-    'empty.none@rec' => 'You have not added any recurring payments yet (loans, installments, phone, insurance...).',
+    'btn.new_sub@rec' => 'New payment',
+    'modal.new_sub@rec' => 'New payment',
+    'empty.none@rec' => 'You have not added any payments yet (subscriptions, loans, installments, phone, insurance...).',
     'empty.no_match@rec' => 'No recurring payments match the filters.',
     'th.subscription@rec' => 'Payment',
-    'modal.default_title@rec' => 'Recurring payment',
+    'modal.default_title@rec' => 'Payment',
     'confirm.cancel@rec' => 'Cancel the recurring payment "{name}"?',
     'confirm.delete@rec' => 'Permanently delete the recurring payment "{name}" and its entire history? This cannot be undone.',
     'msg.sub_added@rec' => 'The recurring payment "{name}" was added.',
@@ -299,4 +299,12 @@ return [
     'activity.deleted' => 'Deleted the subscription',
     'activity.yes' => 'yes',
     'activity.no' => 'no',
+
+    // Unified payments screen
+    'field.type' => 'Type',
+    'kind.subscription' => 'Subscription',
+    'kind.recurring' => 'Recurring payment',
+    'kind.subscription_pl' => 'Subscriptions',
+    'kind.recurring_pl' => 'Recurring payments',
+    'type.all' => 'All',
 ];

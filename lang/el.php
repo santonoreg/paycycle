@@ -31,7 +31,7 @@ return [
     'page.settings'      => 'Ρυθμίσεις',
 
     // Πλοήγηση
-    'nav.subscriptions' => 'Συνδρομές',
+    'nav.subscriptions' => 'Πληρωμές',
     'nav.stats'         => 'Στατιστικά',
     'nav.settings'      => 'Ρυθμίσεις',
     'nav.logged_in'     => 'Συνδεδεμένος',
@@ -213,14 +213,14 @@ return [
     'scope.recurring' => 'Επαναλ. πληρωμές',
     'stats.no_data' => 'Δεν υπάρχουν δεδομένα ακόμα',
     'stats.active_items' => 'Ενεργές συνδρομές & πληρωμές',
-    'page.subscriptions@rec' => 'Επαναλαμβανόμενες πληρωμές',
+    'page.subscriptions@rec' => 'Πληρωμές',
     'idx.active_subs@rec' => 'Ενεργές πληρωμές',
     'btn.new_sub@rec' => 'Νέα πληρωμή',
-    'modal.new_sub@rec' => 'Νέα επαναλαμβανόμενη πληρωμή',
-    'empty.none@rec' => 'Δεν έχεις καταχωρήσει καμία επαναλαμβανόμενη πληρωμή ακόμα (δάνεια, δόσεις, τηλέφωνα, ασφάλειες...).',
+    'modal.new_sub@rec' => 'Νέα πληρωμή',
+    'empty.none@rec' => 'Δεν έχεις καταχωρήσει καμία πληρωμή ακόμα (συνδρομές, δάνεια, δόσεις, τηλέφωνα, ασφάλειες...).',
     'empty.no_match@rec' => 'Καμία πληρωμή δεν ταιριάζει με τα φίλτρα.',
     'th.subscription@rec' => 'Πληρωμή',
-    'modal.default_title@rec' => 'Επαναλαμβανόμενη πληρωμή',
+    'modal.default_title@rec' => 'Πληρωμή',
     'confirm.cancel@rec' => 'Ακύρωση της πληρωμής «{name}»;',
     'confirm.delete@rec' => 'Οριστική διαγραφή της πληρωμής «{name}» και όλου του ιστορικού της; Η ενέργεια δεν αναιρείται.',
     'msg.sub_added@rec' => 'Η πληρωμή «{name}» προστέθηκε.',
@@ -299,4 +299,12 @@ return [
     'activity.deleted' => 'Διαγραφή συνδρομής',
     'activity.yes' => 'ναι',
     'activity.no' => 'όχι',
+
+    // Unified payments screen
+    'field.type' => 'Τύπος',
+    'kind.subscription' => 'Συνδρομή',
+    'kind.recurring' => 'Επαναλαμβανόμενη πληρωμή',
+    'kind.subscription_pl' => 'Συνδρομές',
+    'kind.recurring_pl' => 'Επαναλαμβανόμενες πληρωμές',
+    'type.all' => 'Όλες',
 ];

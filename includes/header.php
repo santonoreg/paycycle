@@ -51,11 +51,6 @@ $backTo = $currentScript . (!empty($_SERVER['QUERY_STRING']) ? '?' . $_SERVER['Q
           </a>
         </li>
         <li class="nav-item">
-          <a class="nav-link <?= $currentScript === 'recurring.php' ? 'active' : '' ?>" href="recurring.php">
-            <i class="bi bi-arrow-repeat"></i> <?= te('nav.recurring') ?>
-          </a>
-        </li>
-        <li class="nav-item">
           <a class="nav-link <?= $currentScript === 'stats.php' ? 'active' : '' ?>" href="stats.php">
             <i class="bi bi-bar-chart-line"></i> <?= te('nav.stats') ?>
           </a>

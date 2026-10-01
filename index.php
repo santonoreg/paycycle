@@ -6,32 +6,38 @@ require __DIR__ . '/includes/functions.php';
 require_once __DIR__ . '/includes/i18n.php';
 require __DIR__ . '/includes/stats_helpers.php';
 
-// recurring.php ορίζει $kind = 'recurring' και φορτώνει αυτό το αρχείο.
-$kind = $kind ?? 'subscription';
-setKind($kind);
+// Ενιαία οθόνη "Πληρωμές": συνδρομές + επαναλαμβανόμενες πληρωμές. Το φίλτρο
+// τύπου (type) περιορίζει τη λίστα· τα κείμενα της σελίδας χρησιμοποιούν τη
+// γενική διατύπωση "πληρωμή" (επίθημα @rec), ενώ κάθε γραμμή χρησιμοποιεί τη
+// διατύπωση του δικού της τύπου στα μηνύματα επιβεβαίωσης.
+$fType = in_array($_GET['type'] ?? '', KINDS, true) ? $_GET['type'] : '';
+const PAGE_KIND = 'recurring';
+setKind(PAGE_KIND);
 
 $pdo = getDb();
 $today = date('Y-m-d');
 
-$allDetails = getAllSubscriptionsWithDetails($pdo, $today, $kind);
+$allDetails = getAllSubscriptionsWithDetails($pdo, $today);
 $activityBySub = getActivityBySubscription($pdo, array_map(fn($d) => (int) $d['sub']['id'], $allDetails));
-$categories = getDistinctCategories($pdo, $kind);
+$categories = getDistinctCategories($pdo);
 $paymentMethods = getDistinctPaymentMethods($pdo);
 
 // --- Συγκεντρωτικά (πάντα υπολογισμένα στο σύνολο, ανεξάρτητα από φίλτρα) ----
+// Τα συγκεντρωτικά ακολουθούν το φίλτρο τύπου.
+$scopeDetails = $fType === '' ? $allDetails : array_values(array_filter($allDetails, fn($d) => $d['sub']['kind'] === $fType));
 $activeCount = 0;
 $monthlySum = 0.0;
 $annualSum = 0.0;
-foreach ($allDetails as $d) {
+foreach ($scopeDetails as $d) {
     if (isRunningStatus($d['sub']['status'])) {
         $activeCount++;
         $monthlySum += $d['stats']['monthly_equivalent'];
         $annualSum += $d['stats']['annual_cost'];
     }
 }
-$upcoming = computeUpcomingTotals($allDetails, $today);
+$upcoming = computeUpcomingTotals($scopeDetails, $today);
 $pendingBills = 0;
-foreach ($allDetails as $d) {
+foreach ($scopeDetails as $d) {
     if ($d['sub']['status'] !== 'canceled') {
         $pendingBills += $d['stats']['estimates_pending'];
     }
@@ -46,7 +52,8 @@ if (!isset($_GET['category']) && $fCategory !== '' && !in_array($fCategory, $cat
 }
 $fQuery = trim($_GET['q'] ?? '');
 
-$details = array_values(array_filter($allDetails, function ($d) use ($fStatus, $fCategory, $fQuery) {
+$details = array_values(array_filter($allDetails, function ($d) use ($fStatus, $fCategory, $fQuery, $fType) {
+    if ($fType !== '' && $d['sub']['kind'] !== $fType) return false;
     if ($fStatus !== '' && $d['sub']['status'] !== $fStatus) return false;
     if ($fCategory !== '' && $d['sub']['category'] !== $fCategory) return false;
     if ($fQuery !== '' && stripos($d['sub']['name'], $fQuery) === false) return false;
@@ -107,11 +114,18 @@ require __DIR__ . '/includes/header.php';
   <div class="alert alert-warning py-2 mb-3"><i class="bi bi-hourglass-split"></i> <?= te('var.pending_total', ['n' => $pendingBills]) ?></div>
 <?php endif; ?>
 
+<ul class="nav nav-pills mb-3">
+  <?php foreach (['' => t('type.all'), 'subscription' => t('kind.subscription_pl'), 'recurring' => t('kind.recurring_pl')] as $tk => $tl): ?>
+    <li class="nav-item"><a class="nav-link py-1 <?= $fType === $tk ? 'active' : '' ?>" href="index.php<?= $tk !== '' ? '?type=' . $tk : '' ?>"><?= htmlspecialchars($tl) ?></a></li>
+  <?php endforeach; ?>
+</ul>
+
 <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
   <form class="d-flex flex-wrap gap-2" method="get">
+    <input type="hidden" name="type" value="<?= htmlspecialchars($fType) ?>">
     <select name="status" class="form-select form-select-sm" style="width:auto" onchange="this.form.submit()">
       <option value=""><?= te('filter.all_statuses') ?></option>
-      <?php foreach (statuses() as $k => $label): if ($k === 'paid_off' && $kind !== 'recurring') continue; ?>
+      <?php foreach (statuses() as $k => $label): ?>
         <option value="<?= $k ?>" <?= $fStatus === $k ? 'selected' : '' ?>><?= htmlspecialchars($label) ?></option>
       <?php endforeach; ?>
     </select>
@@ -124,7 +138,7 @@ require __DIR__ . '/includes/header.php';
     <input type="search" name="q" value="<?= htmlspecialchars($fQuery) ?>" class="form-control form-control-sm" style="width:auto" placeholder="<?= te('filter.search') ?>">
     <button class="btn btn-sm btn-outline-secondary" type="submit"><i class="bi bi-search"></i></button>
     <?php if ($fStatus || $fCategory || $fQuery): ?>
-      <a href="<?= basename($_SERVER['SCRIPT_NAME']) ?>?status=&amp;category=" class="btn btn-sm btn-link"><?= te('common.clear') ?></a>
+      <a href="<?= basename($_SERVER['SCRIPT_NAME']) ?>?type=<?= htmlspecialchars($fType) ?>&amp;status=&amp;category=" class="btn btn-sm btn-link"><?= te('common.clear') ?></a>
     <?php endif; ?>
   </form>
 
@@ -166,6 +180,7 @@ require __DIR__ . '/includes/header.php';
       <tbody>
       <?php foreach ($details as $d):
         $sub = $d['sub']; $stats = $d['stats'];
+        setKind($sub['kind']); // διατύπωση μηνυμάτων ανά τύπο (συνδρομή / πληρωμή)
         $days = daysUntil($stats['next_payment_date'], $today);
         $rowClass = !isRunningStatus($sub['status']) ? 'row-canceled' : '';
         $pricesJson = htmlspecialchars(json_encode(array_map(fn($p) => [
@@ -188,7 +203,7 @@ require __DIR__ . '/includes/header.php';
         <tr class="<?= $rowClass ?>">
           <td>
             <div class="sub-name"><?= htmlspecialchars($sub['name']) ?></div>
-            <div class="sub-category"><?= htmlspecialchars($sub['category']) ?><?php if (!empty($sub['created_by_name'])): ?> · <span title="<?= te('field.added_by') ?>"><i class="bi bi-person"></i> <?= htmlspecialchars($sub['created_by_name']) ?></span><?php endif; ?></div>
+            <div class="sub-category"><span class="badge text-bg-light border fw-normal"><?= te('kind.' . $sub['kind']) ?></span> <?= htmlspecialchars($sub['category']) ?><?php if (!empty($sub['created_by_name'])): ?> · <span title="<?= te('field.added_by') ?>"><i class="bi bi-person"></i> <?= htmlspecialchars($sub['created_by_name']) ?></span><?php endif; ?></div>
           </td>
           <td class="num"><?= $stats['is_variable'] ? '≈ ' : '' ?><?= euro($stats['current_price']) ?><div class="sub-category"><?= te('freq.' . $sub['frequency']) ?><?= $stats['is_variable'] ? ' · ' . te('list.variable') : '' ?></div></td>
           <td class="num"><?= euro($stats['monthly_equivalent']) ?></td>
@@ -220,6 +235,7 @@ require __DIR__ . '/includes/header.php';
             <div class="d-flex gap-1 justify-content-end">
               <button type="button" class="btn btn-sm btn-outline-primary action-icon-btn" data-bs-toggle="modal" data-bs-target="#detailsModal"
                 data-id="<?= $sub['id'] ?>"
+                data-kind="<?= $sub['kind'] ?>"
                 data-name="<?= htmlspecialchars($sub['name']) ?>"
                 data-category="<?= htmlspecialchars($sub['category']) ?>"
                 data-frequency="<?= $sub['frequency'] ?>"
@@ -287,7 +303,7 @@ require __DIR__ . '/includes/header.php';
             </div>
           </td>
         </tr>
-      <?php endforeach; ?>
+      <?php endforeach; setKind(PAGE_KIND); ?>
       </tbody>
     </table>
   </div>
@@ -301,12 +317,19 @@ require __DIR__ . '/includes/header.php';
     <div class="modal-content">
       <form method="post" action="actions/add_subscription.php">
         <?= csrfField() ?>
-        <input type="hidden" name="kind" value="<?= $kind ?>">
         <div class="modal-header">
           <h5 class="modal-title"><i class="bi bi-plus-lg"></i> <?= te('modal.new_sub') ?></h5>
           <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
         </div>
         <div class="modal-body">
+          <div class="mb-3">
+            <label class="form-label"><?= te('field.type') ?></label>
+            <select name="kind" id="add-kind" class="form-select">
+              <?php foreach (KINDS as $k): ?>
+                <option value="<?= $k ?>" <?= $k === ($fType ?: 'subscription') ? 'selected' : '' ?>><?= te('kind.' . $k) ?></option>
+              <?php endforeach; ?>
+            </select>
+          </div>
           <div class="mb-3">
             <label class="form-label"><?= te('field.name') ?></label>
             <input type="text" name="name" class="form-control" required autofocus>
@@ -348,18 +371,18 @@ require __DIR__ . '/includes/header.php';
               </select>
             </div>
           </div>
-          <?php if ($kind === 'recurring'): ?>
-          <div class="mb-3">
-            <label class="form-label"><?= te('field.installments') ?></label>
-            <input type="number" min="1" max="1200" step="1" name="installments" class="form-control" placeholder="<?= te('field.installments_ph') ?>">
-            <div class="form-text"><?= te('field.installments_help') ?></div>
+          <div class="rec-only">
+            <div class="mb-3">
+              <label class="form-label"><?= te('field.installments') ?></label>
+              <input type="number" min="1" max="1200" step="1" name="installments" class="form-control" placeholder="<?= te('field.installments_ph') ?>">
+              <div class="form-text"><?= te('field.installments_help') ?></div>
+            </div>
+            <div class="form-check mb-3">
+              <input class="form-check-input" type="checkbox" name="variable_amount" value="1" id="add-variable">
+              <label class="form-check-label" for="add-variable"><?= te('field.variable') ?></label>
+              <div class="form-text"><?= te('field.variable_help') ?></div>
+            </div>
           </div>
-          <div class="form-check mb-3">
-            <input class="form-check-input" type="checkbox" name="variable_amount" value="1" id="add-variable">
-            <label class="form-check-label" for="add-variable"><?= te('field.variable') ?></label>
-            <div class="form-text"><?= te('field.variable_help') ?></div>
-          </div>
-          <?php endif; ?>
           <div class="mb-1">
             <label class="form-label"><?= te('field.notes') ?></label>
             <textarea name="notes" class="form-control" rows="2"></textarea>
@@ -433,23 +456,23 @@ require __DIR__ . '/includes/header.php';
                     <input type="date" name="start_date" id="edit-start-date" class="form-control" required>
                   </div>
                 </div>
-                <?php if ($kind === 'recurring'): ?>
-                <div class="mb-3">
-                  <label class="form-label"><?= te('field.installments') ?></label>
-                  <input type="number" min="1" max="1200" step="1" name="installments" id="edit-installments" class="form-control" placeholder="<?= te('field.installments_ph') ?>">
-                  <div class="form-text"><?= te('field.installments_help') ?></div>
+                <div class="rec-only">
+                  <div class="mb-3">
+                    <label class="form-label"><?= te('field.installments') ?></label>
+                    <input type="number" min="1" max="1200" step="1" name="installments" id="edit-installments" class="form-control" placeholder="<?= te('field.installments_ph') ?>">
+                    <div class="form-text"><?= te('field.installments_help') ?></div>
+                  </div>
+                  <div class="form-check mb-3">
+                    <input class="form-check-input" type="checkbox" name="variable_amount" value="1" id="edit-variable">
+                    <label class="form-check-label" for="edit-variable"><?= te('field.variable') ?></label>
+                    <div class="form-text"><?= te('field.variable_help') ?></div>
+                  </div>
+                  <div class="mb-3" id="edit-estimate-wrap">
+                    <label class="form-label" for="edit-estimate"><?= te('field.estimate') ?></label>
+                    <input type="number" step="0.01" min="0" name="estimate" id="edit-estimate" class="form-control">
+                    <div class="form-text"><?= te('field.estimate_help') ?></div>
+                  </div>
                 </div>
-                <div class="form-check mb-3">
-                  <input class="form-check-input" type="checkbox" name="variable_amount" value="1" id="edit-variable">
-                  <label class="form-check-label" for="edit-variable"><?= te('field.variable') ?></label>
-                  <div class="form-text"><?= te('field.variable_help') ?></div>
-                </div>
-                <div class="mb-3" id="edit-estimate-wrap">
-                  <label class="form-label" for="edit-estimate"><?= te('field.estimate') ?></label>
-                  <input type="number" step="0.01" min="0" name="estimate" id="edit-estimate" class="form-control">
-                  <div class="form-text"><?= te('field.estimate_help') ?></div>
-                </div>
-                <?php endif; ?>
                 <div class="mb-3">
                   <label class="form-label"><?= te('field.notes') ?></label>
                   <textarea name="notes" id="edit-notes" class="form-control" rows="2"></textarea>
@@ -462,9 +485,9 @@ require __DIR__ . '/includes/header.php';
                 <dt class="col-4"><?= te('field.frequency') ?></dt><dd class="col-8" id="ro-frequency"></dd>
                 <dt class="col-4"><?= te('field.payment_method') ?></dt><dd class="col-8" id="ro-payment-method"></dd>
                 <dt class="col-4"><?= te('field.start_date') ?></dt><dd class="col-8" id="ro-start-date"></dd>
-                <?php if ($kind === 'recurring'): ?>
-                <dt class="col-4"><?= te('field.installments') ?></dt><dd class="col-8" id="ro-installments"></dd>
-                <?php endif; ?>
+                <div class="col-12 rec-only"><div class="row">
+                  <dt class="col-4"><?= te('field.installments') ?></dt><dd class="col-8" id="ro-installments"></dd>
+                </div></div>
                 <dt class="col-4"><?= te('field.notes') ?></dt><dd class="col-8" id="ro-notes"></dd>
               </dl>
               <a href="<?= htmlspecialchars(loginUrl(basename($_SERVER['SCRIPT_NAME']))) ?>" class="btn btn-outline-primary btn-sm mt-2">
