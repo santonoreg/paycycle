@@ -189,6 +189,7 @@ Every time a subscription is "charged" (monthly/yearly/etc.), the app
 - **Row menu:** all row actions (details/edit, duplicate, freeze, cancel, delete...) are
   in the **...** menu; clicking the name also opens the details.
 - **Messages** appear as toasts that disappear after a few seconds.
+- **Theme:** the three buttons next to the language menu switch between light, dark and automatic (follows the device); remembered per browser in a cookie.
 - **Page width:** the switch next to the language menu toggles full width or boxed (max 1500px); it is remembered per browser in a cookie.
 
 ## 6. Languages and Settings
@@ -196,7 +197,7 @@ Every time a subscription is "charged" (monthly/yearly/etc.), the app
 - Available languages: **Greek, English, German**. A visitor can switch
   language from the menu at the top right (this only affects them, via a cookie).
 - The **Settings** page (admin only to save) sets, for everyone:
-  the default language, the theme (light / dark / automatic) and the default
+  the default language, and the default
   filter of the subscription list (status and category). The default filter
   only applies when the list is opened without a filter chosen.
 - To add a language: copy `lang/en.php` to `lang/<code>.php`, translate it and
@@ -216,7 +217,7 @@ Every time a subscription is "charged" (monthly/yearly/etc.), the app
 config.php                  settings (timezone, database path)
 includes/db.php             SQLite connection (creates the database if missing)
 includes/migrations.php     schema migrations (with a backup before upgrading)
-includes/i18n.php           translations t() + settings (language/theme/filters)
+includes/i18n.php           translations t() + settings (language/filters)
 includes/auth.php           users, login, roles (admin/user) + CSRF
 includes/functions.php      calculation core + the "payment ledger"
 includes/stats_helpers.php  aggregates for the dashboard

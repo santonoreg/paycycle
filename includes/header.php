@@ -6,7 +6,12 @@ $navKind = currentKind();
 setKind('subscription'); // η πλοήγηση δεν αλλάζει διατύπωση
 
 $currentScript = basename($_SERVER['SCRIPT_NAME']);
-$themePref = getSetting('theme');
+// Θέμα: προτίμηση του επισκέπτη (cookie, από τα κουμπιά στο μενού). Αν δεν έχει επιλέξει,
+// ισχύει η τιμή που είχε αποθηκευτεί παλιότερα στις ρυθμίσεις (προεπιλογή: φωτεινό).
+$themePref = $_COOKIE['theme'] ?? '';
+if (!in_array($themePref, THEMES, true)) {
+    $themePref = getSetting('theme');
+}
 if (!in_array($themePref, THEMES, true)) {
     $themePref = 'light';
 }
@@ -22,12 +27,16 @@ $backTo = $currentScript . (!empty($_SERVER['QUERY_STRING']) ? '?' . $_SERVER['Q
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title><?= htmlspecialchars($pageTitle) ?> — <?= te('app.name') ?></title>
 <script>
-// Θέμα "Αυτόματο": ακολουθεί το θέμα της συσκευής (πριν το πρώτο painting, ώστε να μην "αναβοσβήνει").
+// Θέμα: "light" / "dark" / "auto" (ακολουθεί τη συσκευή). Εφαρμόζεται πριν το πρώτο painting,
+// ώστε να μην "αναβοσβήνει"· η window.applyThemePref χρησιμοποιείται και από τα κουμπιά του μενού.
 (function () {
   var root = document.documentElement;
-  if (root.getAttribute('data-theme-pref') !== 'auto') return;
   var mq = window.matchMedia('(prefers-color-scheme: dark)');
-  function apply() { root.setAttribute('data-bs-theme', mq.matches ? 'dark' : 'light'); }
+  function apply() {
+    var pref = root.getAttribute('data-theme-pref');
+    root.setAttribute('data-bs-theme', pref === 'auto' ? (mq.matches ? 'dark' : 'light') : (pref === 'dark' ? 'dark' : 'light'));
+  }
+  window.applyThemePref = function (pref) { root.setAttribute('data-theme-pref', pref); apply(); };
   apply();
   if (mq.addEventListener) mq.addEventListener('change', apply);
 })();
@@ -76,6 +85,13 @@ $backTo = $currentScript . (!empty($_SERVER['QUERY_STRING']) ? '?' . $_SERVER['Q
         </li>
       </ul>
       <ul class="navbar-nav align-items-lg-center">
+        <li class="nav-item me-lg-2 my-2 my-lg-0">
+          <div class="btn-group btn-group-sm theme-toggle" role="group" aria-label="<?= te('nav.theme') ?>" data-base="<?= htmlspecialchars(appBasePath()) ?>">
+            <?php foreach (['light' => 'sun', 'dark' => 'moon-stars', 'auto' => 'display'] as $th => $icon): ?>
+              <button type="button" class="btn btn-outline-light <?= $themePref === $th ? 'active' : '' ?>" data-theme="<?= $th ?>" title="<?= te('nav.theme_' . $th) ?>" aria-pressed="<?= $themePref === $th ? 'true' : 'false' ?>"><i class="bi bi-<?= $icon ?>"></i></button>
+            <?php endforeach; ?>
+          </div>
+        </li>
         <li class="nav-item me-lg-2 my-2 my-lg-0">
           <div class="btn-group btn-group-sm layout-toggle" role="group" aria-label="<?= te('nav.layout') ?>" data-base="<?= htmlspecialchars(appBasePath()) ?>">
             <button type="button" class="btn btn-outline-light <?= $layout === 'full' ? 'active' : '' ?>" data-layout="full" title="<?= te('nav.layout_full') ?>" aria-pressed="<?= $layout === 'full' ? 'true' : 'false' ?>"><i class="bi bi-arrows-fullscreen"></i></button>

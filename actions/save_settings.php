@@ -14,14 +14,13 @@ if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
 verifyCsrf();
 
 $language = $_POST['language'] ?? '';
-$theme = $_POST['theme'] ?? '';
 $status = $_POST['default_status'] ?? '';
 $category = trim($_POST['default_category'] ?? '');
 
 $pdo = getDb();
 $validCategory = $category === '' || in_array($category, getDistinctCategories($pdo), true);
 
-if (!isset(SUPPORTED_LANGUAGES[$language]) || !in_array($theme, THEMES, true)
+if (!isset(SUPPORTED_LANGUAGES[$language])
     || ($status !== '' && !in_array($status, STATUS_KEYS, true)) || !$validCategory) {
     flash('danger', t('settings.invalid'));
     header('Location: ../settings.php');
@@ -30,7 +29,6 @@ if (!isset(SUPPORTED_LANGUAGES[$language]) || !in_array($theme, THEMES, true)
 
 saveSettings($pdo, [
     'language'         => $language,
-    'theme'            => $theme,
     'default_status'   => $status,
     'default_category' => $category,
 ]);

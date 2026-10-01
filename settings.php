@@ -44,17 +44,6 @@ require __DIR__ . '/includes/header.php';
       </div>
 
       <div class="mb-4">
-        <div class="form-label fw-semibold"><i class="bi bi-circle-half"></i> <?= te('settings.theme') ?></div>
-        <?php foreach (['light' => 'sun', 'dark' => 'moon-stars', 'auto' => 'display'] as $th => $icon): ?>
-          <div class="form-check">
-            <input class="form-check-input" type="radio" name="theme" id="theme-<?= $th ?>" value="<?= $th ?>"
-              <?= $settings['theme'] === $th ? 'checked' : '' ?> <?= $disabled ?>>
-            <label class="form-check-label" for="theme-<?= $th ?>"><i class="bi bi-<?= $icon ?>"></i> <?= te('settings.theme.' . $th) ?></label>
-          </div>
-        <?php endforeach; ?>
-      </div>
-
-      <div class="mb-4">
         <div class="form-label fw-semibold"><i class="bi bi-funnel"></i> <?= te('settings.filters') ?></div>
         <div class="form-text mb-2"><?= te('settings.filters_help') ?></div>
         <div class="row g-2">

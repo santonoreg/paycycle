@@ -94,6 +94,25 @@ document.addEventListener('DOMContentLoaded', function () {
     });
   }
 
+  // --- Θέμα: φωτεινό / σκούρο / αυτόματο (cookie, ισχύει αμέσως) ---
+  var themeToggle = document.querySelector('.theme-toggle');
+  if (themeToggle) {
+    themeToggle.querySelectorAll('[data-theme]').forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        var pref = btn.getAttribute('data-theme');
+        if (window.applyThemePref) window.applyThemePref(pref);
+        themeToggle.querySelectorAll('[data-theme]').forEach(function (b) {
+          var on = b === btn;
+          b.classList.toggle('active', on);
+          b.setAttribute('aria-pressed', on ? 'true' : 'false');
+        });
+        document.cookie = 'theme=' + pref + '; path=' + (themeToggle.getAttribute('data-base') || '/') + '; max-age=31536000; SameSite=Lax';
+        // Τα γραφήματα παίρνουν τα χρώματα τους κατά τη δημιουργία: ξαναφορτώνεται η σελίδα στατιστικών.
+        if (/stats\.php/.test(location.pathname)) location.reload();
+      });
+    });
+  }
+
   // --- Μηνύματα (toast): εμφανίζονται και εξαφανίζονται μόνα τους ---
   document.querySelectorAll('.toast-container .toast').forEach(function (el) {
     bootstrap.Toast.getOrCreateInstance(el).show();
