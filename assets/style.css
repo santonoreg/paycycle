@@ -289,3 +289,14 @@ a { color: var(--brand); }
 .subs-table tbody tr.row-ended-canceled td:first-child { border-left: 4px solid var(--canceled); }
 .subs-table tbody tr.row-ended-expired  td:first-child { border-left: 4px solid var(--orange); }
 .subs-table tbody tr.row-ended-paid_off td:first-child { border-left: 4px solid var(--done); }
+
+/* ---- Tags τύπου και είδους στη στήλη κατάστασης ---- */
+.tag {
+  display: inline-flex; align-items: center;
+  padding: 0.2em 0.6em; border-radius: 6px;
+  font-size: 0.74rem; font-weight: 600; white-space: nowrap;
+  border: 1px solid transparent;
+}
+.tag-subscription { background: var(--brand-tint); color: var(--brand-dark); }
+.tag-recurring    { background: var(--gold-tint);  color: var(--gold); }
+.tag-category     { background: var(--surface-2);  color: var(--text-muted); border-color: var(--border); }

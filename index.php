@@ -248,7 +248,7 @@ if ($expiring): ?>
         <tr class="<?= $rowClass ?>">
           <td>
             <div class="sub-name js-name-open" role="button" tabindex="0"><?= htmlspecialchars($sub['name']) ?></div>
-            <div class="sub-category"><span class="badge text-bg-light border fw-normal"><?= te('kind.' . $sub['kind']) ?></span> <?= htmlspecialchars($sub['category']) ?><?php if (($sub['payment_method'] ?? '') === 'card' && isset($cardsById[(int) $sub['card_id']])): ?> · <span title="<?= te('field.payment_method') ?>"><i class="bi bi-credit-card"></i> ••••<?= htmlspecialchars($cardsById[(int) $sub['card_id']]['last4']) ?></span><?php endif; ?><?php if (!empty($sub['created_by_name'])): ?> · <span title="<?= te('field.added_by') ?>"><i class="bi bi-person"></i> <?= htmlspecialchars($sub['created_by_name']) ?></span><?php endif; ?></div>
+            <div class="sub-category"><?php if (($sub['payment_method'] ?? '') === 'card' && isset($cardsById[(int) $sub['card_id']])): ?><span title="<?= te('field.payment_method') ?>"><i class="bi bi-credit-card"></i> ••••<?= htmlspecialchars($cardsById[(int) $sub['card_id']]['last4']) ?></span><?php endif; ?><?php if (!empty($sub['created_by_name'])): ?><?= ($sub['payment_method'] ?? '') === 'card' && isset($cardsById[(int) $sub['card_id']]) ? ' · ' : '' ?><span title="<?= te('field.added_by') ?>"><i class="bi bi-person"></i> <?= htmlspecialchars($sub['created_by_name']) ?></span><?php endif; ?></div>
           </td>
           <td class="num"><?= $stats['is_variable'] ? '≈ ' : '' ?><?= euro($stats['current_price']) ?><div class="sub-category"><?= te('freq.' . $sub['frequency']) ?><?= $stats['is_variable'] ? ' · ' . te('list.variable') : '' ?></div></td>
           <td class="num"><?= euro($stats['monthly_equivalent']) ?></td>
@@ -271,7 +271,11 @@ if ($expiring): ?>
           </td>
           <td class="text-end num"><?= euro($stats['total_paid']) ?></td>
           <td>
-            <span class="status-badge status-<?= $sub['status'] ?>"><?= te('status.' . $sub['status']) ?></span>
+            <div class="d-flex flex-wrap gap-1 align-items-center">
+              <span class="status-badge status-<?= $sub['status'] ?>"><?= te('status.' . $sub['status']) ?></span>
+              <span class="tag tag-<?= $sub['kind'] ?>" title="<?= te('field.type') ?>"><?= te('kind.' . $sub['kind']) ?></span>
+              <span class="tag tag-category" title="<?= te('field.category') ?>"><?= htmlspecialchars($sub['category']) ?></span>
+            </div>
             <?php if (!empty($sub['end_date'])):
                 $leftDays = daysUntil($sub['end_date'], $today); ?>
               <div class="sub-category <?= ($sub['status'] !== 'expired' && $leftDays !== null && $leftDays >= 0 && $leftDays <= EXPIRY_WARNING_DAYS) ? 'next-soon' : '' ?>">
