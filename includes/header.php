@@ -51,6 +51,11 @@ $backTo = $currentScript . (!empty($_SERVER['QUERY_STRING']) ? '?' . $_SERVER['Q
           </a>
         </li>
         <li class="nav-item">
+          <a class="nav-link <?= $currentScript === 'cards.php' ? 'active' : '' ?>" href="cards.php">
+            <i class="bi bi-credit-card"></i> <?= te('nav.cards') ?>
+          </a>
+        </li>
+        <li class="nav-item">
           <a class="nav-link <?= $currentScript === 'stats.php' ? 'active' : '' ?>" href="stats.php">
             <i class="bi bi-bar-chart-line"></i> <?= te('nav.stats') ?>
           </a>
@@ -107,13 +112,20 @@ $backTo = $currentScript . (!empty($_SERVER['QUERY_STRING']) ? '?' . $_SERVER['Q
 <?php setKind($navKind); ?>
 <div class="container-fluid px-3 px-md-4 pb-5">
 <?php
+// Μηνύματα: toast που εξαφανίζεται μόνο του (επιτυχία/πληροφορία: λίγα δευτερόλεπτα,
+// προειδοποίηση/σφάλμα: περισσότερο). Μπορεί να κλείσει και με το (x).
 if (!empty($_SESSION['flash'])) {
+    echo '<div class="toast-container position-fixed top-0 end-0 p-3" style="z-index:1090">';
     foreach ($_SESSION['flash'] as $flash) {
-        $type = htmlspecialchars($flash['type']);
+        $type = in_array($flash['type'], ['success', 'danger', 'warning', 'info'], true) ? $flash['type'] : 'info';
+        $delay = in_array($type, ['danger', 'warning'], true) ? 9000 : min(6000, 3500 + 30 * mb_strlen($flash["msg"]));
+        $closeCls = in_array($type, ['success', 'danger'], true) ? ' btn-close-white' : '';
         $msg = htmlspecialchars($flash['msg']);
-        echo "<div class=\"alert alert-$type alert-dismissible fade show\" role=\"alert\">$msg
-            <button type=\"button\" class=\"btn-close\" data-bs-dismiss=\"alert\"></button></div>";
+        echo "<div class=\"toast align-items-center text-bg-$type border-0\" role=\"alert\" aria-live=\"assertive\" data-bs-delay=\"$delay\">"
+            . "<div class=\"d-flex\"><div class=\"toast-body\">$msg</div>"
+            . "<button type=\"button\" class=\"btn-close$closeCls me-2 m-auto\" data-bs-dismiss=\"toast\"></button></div></div>";
     }
+    echo '</div>';
     unset($_SESSION['flash']);
 }
 ?>

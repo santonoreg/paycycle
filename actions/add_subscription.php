@@ -16,8 +16,9 @@ verifyCsrf();
 $name = trim($_POST['name'] ?? '');
 $category = trim($_POST['category'] ?? '');
 $frequency = $_POST['frequency'] ?? '';
-$paymentMethod = trim($_POST['payment_method'] ?? '') ?: null;
+[$paymentMethod, $cardId, $pmError] = resolvePaymentMethod(getDb(), $_POST['payment_method'] ?? '', $_POST['card_id'] ?? '');
 $startDate = $_POST['start_date'] ?? '';
+$endDate = trim($_POST['end_date'] ?? '') ?: null; // προαιρετική ημερομηνία λήξης
 $cost = $_POST['cost'] ?? '';
 $status = $_POST['status'] ?? 'active';
 $notes = trim($_POST['notes'] ?? '') ?: null;
@@ -33,6 +34,8 @@ if ($name === '') $errors[] = t('err.name_required');
 if ($category === '') $errors[] = t('err.category_required');
 if (!in_array($frequency, FREQUENCY_KEYS, true)) $errors[] = t('err.invalid_frequency');
 if (!DateTime::createFromFormat('Y-m-d', $startDate)) $errors[] = t('err.invalid_start');
+if ($pmError !== null) $errors[] = $pmError;
+if ($endDate !== null && (!DateTime::createFromFormat('Y-m-d', $endDate) || $endDate < $startDate)) $errors[] = t('err.invalid_end');
 if (!is_numeric($cost) || (float) $cost < 0) $errors[] = t('err.invalid_cost');
 if (!in_array($status, ['active', 'trial'], true)) $status = 'active';
 if ($kind === 'recurring' && $installmentsRaw !== '') {
@@ -51,10 +54,25 @@ if ($errors) {
 
 $pdo = getDb();
 $today = date('Y-m-d');
+// Αν η ημερομηνία λήξης έχει ήδη περάσει, η εγγραφή καταχωρείται ως "Έληξε" και το
+// ιστορικό πληρωμών γεμίζει μόνο μέχρι τη λήξη.
+$canceledDate = null;
+$fillUntil = $today;
+if ($endDate !== null && $endDate < $today) {
+    $status = 'expired';
+    $canceledDate = $endDate;
+    $fillUntil = $endDate;
+}
+$copyOf = null;
+if (ctype_digit((string) ($_POST['copy_from'] ?? ''))) {
+    $cp = $pdo->prepare('SELECT name FROM subscriptions WHERE id = ?');
+    $cp->execute([(int) $_POST['copy_from']]);
+    $copyOf = $cp->fetchColumn() ?: null;
+}
 $pdo->beginTransaction();
 try {
-    $stmt = $pdo->prepare('INSERT INTO subscriptions (name, category, frequency, payment_method, start_date, status, notes, kind, total_installments, variable_amount, created_by, created_by_name) VALUES (?,?,?,?,?,?,?,?,?,?,?,?)');
-    $stmt->execute([$name, $category, $frequency, $paymentMethod, $startDate, $status, $notes, $kind, $installments, $variableAmount, currentUser()['id'], currentUser()['username']]);
+    $stmt = $pdo->prepare('INSERT INTO subscriptions (name, category, frequency, payment_method, start_date, status, notes, kind, total_installments, variable_amount, created_by, created_by_name, card_id, end_date, canceled_date) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)');
+    $stmt->execute([$name, $category, $frequency, $paymentMethod, $startDate, $status, $notes, $kind, $installments, $variableAmount, currentUser()['id'], currentUser()['username'], $cardId, $endDate, $canceledDate]);
     $subId = $pdo->lastInsertId();
 
     $stmt2 = $pdo->prepare('INSERT INTO subscription_prices (subscription_id, cost, effective_from) VALUES (?,?,?)');
@@ -62,11 +80,11 @@ try {
 
     // Αν η ημερομηνία έναρξης είναι στο παρελθόν, "γέμισε" αμέσως το ιστορικό
     // πληρωμών μέχρι σήμερα και υπολόγισε την επόμενη δόση.
-    $newSub = ['id' => $subId, 'start_date' => $startDate, 'frequency' => $frequency, 'status' => $status, 'canceled_date' => null];
+    $newSub = ['id' => $subId, 'start_date' => $startDate, 'frequency' => $frequency, 'status' => $status, 'canceled_date' => $canceledDate];
     $newPrices = [['cost' => (float) $cost, 'effective_from' => $startDate]];
-    $inserted = syncSubscriptionLedger($pdo, $newSub, $newPrices, [], $today);
+    $inserted = syncSubscriptionLedger($pdo, $newSub, $newPrices, [], $fillUntil);
 
-    logActivity($pdo, (int) $subId, $name, 'created');
+    logActivity($pdo, (int) $subId, $name, 'created', $copyOf !== null ? ['copy_of' => $copyOf] : []);
     $pdo->commit();
     $msg = t('msg.sub_added', ['name' => $name]);
     if ($inserted > 0) {

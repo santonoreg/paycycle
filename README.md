@@ -168,6 +168,28 @@ Every time a subscription is "charged" (monthly/yearly/etc.), the app
   payment; confirmed amounts are used in all totals and charts, and future
   estimates and the forecast follow the new average.
 
+## 5b. Payment methods, cards, expiry and duplicating
+
+- **Payment method:** Cash / Bank transfer, or **Card**. For a card you pick one of the
+  cards registered under **Cards** (menu). Only a name and the **last 4 digits** are
+  stored, never a full card number. The **Cards** page shows, per card, how many
+  payments are linked to it (and their monthly cost) and links to the list filtered
+  by that card (`index.php?card=ID`; there is also a card filter on the Payments
+  screen). A card that is still used by payments cannot be deleted. Entries created
+  before this feature keep their old free-text payment method (shown as "old entry").
+- **Expiry:** an entry can have an optional **end date**. No payment is recorded after it,
+  and the day after it the entry automatically becomes **Expired** (logged in the
+  *Changes* tab as done by the System). Entries ending within 30 days are listed in a
+  banner on the Payments screen and marked in the list. Use **Reactivate** (or set a
+  later end date in the details window) to renew an expired entry; the time it was
+  expired is not counted as paid.
+- **Duplicate:** the **...** menu of each row has *Duplicate*, which opens the new-payment
+  form pre-filled with the entry's data (type, category, cost, card, notes...). If the
+  same subscription is for another customer, write the customer in the notes.
+- **Row menu:** all row actions (details/edit, duplicate, freeze, cancel, delete...) are
+  in the **...** menu; clicking the name also opens the details.
+- **Messages** appear as toasts that disappear after a few seconds.
+
 ## 6. Languages and Settings
 
 - Available languages: **Greek, English, German**. A visitor can switch

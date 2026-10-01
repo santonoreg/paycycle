@@ -89,6 +89,29 @@ function getMigrations(): array
                 $pdo->exec('CREATE INDEX IF NOT EXISTS idx_activity_sub ON subscription_activity(subscription_id, id)');
             },
         ],
+        8 => [
+            'name' => 'cards table + subscriptions.card_id (payment cards, last 4 digits only)',
+            'up'   => function (PDO $pdo): void {
+                $pdo->exec("
+                    CREATE TABLE IF NOT EXISTS cards (
+                        id         INTEGER PRIMARY KEY AUTOINCREMENT,
+                        name       TEXT NOT NULL,
+                        last4      TEXT NOT NULL CHECK(length(last4) = 4),
+                        created_at TEXT NOT NULL DEFAULT (datetime('now'))
+                    )
+                ");
+                $cols = array_column($pdo->query('PRAGMA table_info(subscriptions)')->fetchAll(), 'name');
+                if (!in_array('card_id', $cols, true)) {
+                    $pdo->exec('ALTER TABLE subscriptions ADD COLUMN card_id INTEGER REFERENCES cards(id) ON DELETE SET NULL');
+                }
+                $pdo->exec('CREATE INDEX IF NOT EXISTS idx_subscriptions_card ON subscriptions(card_id)');
+            },
+        ],
+        9 => [
+            'name' => 'subscriptions.end_date + status expired (table rebuild, data preserved)',
+            'own_transaction' => true,
+            'up'   => 'migrateEndDateAndExpired',
+        ],
         4 => [
             'name' => 'subscriptions.total_installments + status paid_off (table rebuild, data preserved)',
             'own_transaction' => true,
@@ -136,6 +159,78 @@ function migrateUsers(PDO $pdo): void
         $pdo->prepare("INSERT INTO users (username, password_hash, role) VALUES ('admin', ?, 'admin')")->execute([$hash]);
         $adminId = (int) $pdo->lastInsertId();
         $pdo->prepare("UPDATE subscriptions SET created_by = ?, created_by_name = 'admin' WHERE created_by IS NULL")->execute([$adminId]);
+    }
+}
+
+/**
+ * Προσθέτει την προαιρετική ημερομηνία λήξης (end_date) και την κατάσταση
+ * 'expired' (Έληξε). Επειδή το SQLite δεν αλλάζει CHECK constraints με ALTER, ο
+ * πίνακας ξαναχτίζεται όπως στο migration 4: τα foreign keys κλείνουν προσωρινά
+ * ώστε τα παιδικά records να ΜΗΝ διαγραφούν, αντιγράφονται ΟΛΕΣ οι υπάρχουσες
+ * στήλες και ελέγχεται το πλήθος γραμμών πριν ολοκληρωθεί.
+ */
+function migrateEndDateAndExpired(PDO $pdo): void
+{
+    $newCols = ['id', 'name', 'category', 'frequency', 'payment_method', 'start_date', 'status', 'canceled_date', 'notes',
+                'created_at', 'updated_at', 'kind', 'total_installments', 'variable_amount', 'created_by', 'created_by_name',
+                'card_id', 'end_date'];
+    $oldCols = array_column($pdo->query('PRAGMA table_info(subscriptions)')->fetchAll(), 'name');
+    $copy = implode(', ', array_values(array_intersect($newCols, $oldCols)));
+
+    $pdo->exec('PRAGMA foreign_keys = OFF');
+    $pdo->beginTransaction();
+    try {
+        $before = (int) $pdo->query('SELECT COUNT(*) FROM subscriptions')->fetchColumn();
+        $seq = (int) $pdo->query("SELECT COALESCE((SELECT seq FROM sqlite_sequence WHERE name = 'subscriptions'), 0)")->fetchColumn();
+
+        $pdo->exec('DROP TABLE IF EXISTS subscriptions_new');
+        $pdo->exec("
+            CREATE TABLE subscriptions_new (
+                id                 INTEGER PRIMARY KEY AUTOINCREMENT,
+                name               TEXT NOT NULL,
+                category           TEXT NOT NULL,
+                frequency          TEXT NOT NULL CHECK(frequency IN ('weekly','monthly','half-yearly','yearly','biennial','triennial')),
+                payment_method     TEXT,
+                start_date         TEXT NOT NULL,
+                status             TEXT NOT NULL DEFAULT 'active' CHECK(status IN ('active','trial','frozen','canceled','paid_off','expired')),
+                canceled_date      TEXT,
+                notes              TEXT,
+                created_at         TEXT NOT NULL DEFAULT (datetime('now')),
+                updated_at         TEXT NOT NULL DEFAULT (datetime('now')),
+                kind               TEXT NOT NULL DEFAULT 'subscription' CHECK(kind IN ('subscription','recurring')),
+                total_installments INTEGER CHECK(total_installments IS NULL OR total_installments >= 1),
+                variable_amount    INTEGER NOT NULL DEFAULT 0 CHECK(variable_amount IN (0,1)),
+                created_by         INTEGER REFERENCES users(id) ON DELETE SET NULL,
+                created_by_name    TEXT,
+                card_id            INTEGER REFERENCES cards(id) ON DELETE SET NULL,
+                end_date           TEXT
+            )
+        ");
+        $pdo->exec("INSERT INTO subscriptions_new ($copy) SELECT $copy FROM subscriptions");
+
+        $after = (int) $pdo->query('SELECT COUNT(*) FROM subscriptions_new')->fetchColumn();
+        if ($before !== $after) {
+            throw new RuntimeException("Migration aborted: row count mismatch ($before vs $after)");
+        }
+
+        $pdo->exec('DROP TABLE subscriptions');
+        $pdo->exec('ALTER TABLE subscriptions_new RENAME TO subscriptions');
+        // Τα id δεν πρέπει να ξαναχρησιμοποιηθούν (το ιστορικό ενεργειών αναφέρεται σε αυτά).
+        $pdo->prepare("UPDATE sqlite_sequence SET seq = MAX(seq, ?) WHERE name = 'subscriptions'")->execute([$seq]);
+        $pdo->exec('CREATE INDEX IF NOT EXISTS idx_subscriptions_kind ON subscriptions(kind)');
+        $pdo->exec('CREATE INDEX IF NOT EXISTS idx_subscriptions_card ON subscriptions(card_id)');
+
+        if ($pdo->query('PRAGMA foreign_key_check')->fetch()) {
+            throw new RuntimeException('Migration aborted: foreign key check failed');
+        }
+        $pdo->commit();
+    } catch (Throwable $e) {
+        if ($pdo->inTransaction()) {
+            $pdo->rollBack();
+        }
+        throw $e;
+    } finally {
+        $pdo->exec('PRAGMA foreign_keys = ON');
     }
 }
 
@@ -219,7 +314,7 @@ function runMigrations(PDO $pdo, bool $backupExisting = false): void
     }
 
     foreach ($pending as $version => $migration) {
-        // Τα migrations 1 και 4 χειρίζονται μόνα τους τα transactions/foreign keys.
+        // Τα migrations 1, 4 και 9 χειρίζονται μόνα τους τα transactions/foreign keys.
         if ($version === 1 || !empty($migration['own_transaction'])) {
             call_user_func($migration['up'], $pdo);
         } else {

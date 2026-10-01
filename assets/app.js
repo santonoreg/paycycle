@@ -41,6 +41,99 @@ document.addEventListener('DOMContentLoaded', function () {
     applyKind(addForm, addKind.value);
   }
 
+
+  // --- Τρόπος πληρωμής: η επιλογή κάρτας φαίνεται μόνο όταν επιλεγεί "Κάρτα" ---
+  function syncPm(scope) {
+    if (!scope) return;
+    var pm = scope.querySelector('.js-pm'), card = scope.querySelector('.js-card');
+    if (!pm || !card) return;
+    var on = pm.value === 'card';
+    card.classList.toggle('d-none', !on);
+    card.disabled = !on;
+    var empty = scope.querySelector('.js-card-empty');
+    if (empty) empty.classList.toggle('d-none', !on);
+  }
+  function setPm(prefix, method, cardId) {
+    var pm = document.getElementById(prefix + '-pm');
+    if (!pm) return;
+    pm.querySelectorAll('option[data-legacy]').forEach(function (o) { o.remove(); });
+    if (method && method !== 'cash' && method !== 'card') {
+      // Παλιά εγγραφή με ελεύθερο κείμενο: διατηρείται όπως ήταν
+      var o = document.createElement('option');
+      o.value = method;
+      o.textContent = method + ' (' + I18N.js.legacy_method + ')';
+      o.setAttribute('data-legacy', '1');
+      pm.appendChild(o);
+    }
+    pm.value = method || '';
+    var card = document.getElementById(prefix + '-card');
+    if (card && cardId) card.value = cardId;
+    syncPm(pm.parentNode);
+  }
+  document.querySelectorAll('.js-pm').forEach(function (pm) {
+    pm.addEventListener('change', function () { syncPm(pm.parentNode); });
+  });
+
+  // --- Μηνύματα (toast): εμφανίζονται και εξαφανίζονται μόνα τους ---
+  document.querySelectorAll('.toast-container .toast').forEach(function (el) {
+    bootstrap.Toast.getOrCreateInstance(el).show();
+  });
+
+  // --- Όνομα εγγραφής: άνοιγμα λεπτομερειών ---
+  document.querySelectorAll('.js-name-open').forEach(function (el) {
+    function go() {
+      var b = el.closest('tr').querySelector('.js-open-details');
+      if (b) b.click();
+    }
+    el.addEventListener('click', go);
+    el.addEventListener('keydown', function (e) {
+      if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); go(); }
+    });
+  });
+
+  // --- Αντιγραφή εγγραφής: ανοίγει τη φόρμα "Νέα πληρωμή" προσυμπληρωμένη ---
+  var addModalEl = document.getElementById('addModal');
+  var addFormEl = document.getElementById('addForm');
+  function resetAddForm() {
+    if (!addFormEl) return;
+    addFormEl.reset();
+    document.getElementById('add-copy-from').value = '';
+    document.getElementById('dup-hint').classList.add('d-none');
+    document.getElementById('addModalTitleText').textContent = I18N.js.new_title;
+    var kindSel = document.getElementById('add-kind');
+    if (kindSel) applyKind(addFormEl, kindSel.value);
+    syncPm(addFormEl);
+  }
+  if (addModalEl && addFormEl) {
+    addModalEl.addEventListener('hidden.bs.modal', resetAddForm);
+    document.querySelectorAll('.js-duplicate').forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        var src = btn.closest('tr').querySelector('.js-open-details');
+        if (!src) return;
+        var d = src.dataset;
+        resetAddForm();
+        function field(n) { return addFormEl.elements.namedItem(n); }
+        var kindSel = document.getElementById('add-kind');
+        kindSel.value = d.kind;
+        applyKind(addFormEl, d.kind);
+        field('name').value = d.name || '';
+        field('category').value = d.category || '';
+        field('frequency').value = d.frequency || 'monthly';
+        field('cost').value = d.currentPrice || '';
+        field('notes').value = d.notes || '';
+        if (d.installments) field('installments').value = d.installments;
+        field('variable_amount').checked = d.variable === '1';
+        setPm('add', d.paymentMethod, d.cardId);
+        document.getElementById('add-copy-from').value = d.id;
+        var hint = document.getElementById('dup-hint');
+        hint.textContent = tpl(I18N.js.dup_hint, { name: d.name });
+        hint.classList.remove('d-none');
+        document.getElementById('addModalTitleText').textContent = I18N.js.dup_title;
+        bootstrap.Modal.getOrCreateInstance(addModalEl).show();
+      });
+    });
+  }
+
   var detailsModal = document.getElementById('detailsModal');
   if (detailsModal) {
     detailsModal.addEventListener('show.bs.modal', function (event) {
@@ -51,12 +144,26 @@ document.addEventListener('DOMContentLoaded', function () {
       var titleEl = document.getElementById('detailsModalTitle');
       if (titleEl) titleEl.textContent = d.name;
 
+      // Κατάσταση: πράσινο όταν η εγγραφή είναι ενεργή, πορτοκαλί όταν δεν είναι
+      var isOk = d.status === 'active' || d.status === 'trial';
+      var pill = document.getElementById('detailsStatus');
+      if (pill) {
+        pill.textContent = (I18N.status || {})[d.status] || d.status;
+        pill.className = 'status-pill ms-2 ' + (isOk ? 'status-pill-ok' : 'status-pill-off');
+      }
+      var head = detailsModal.querySelector('.modal-header');
+      if (head) {
+        head.classList.toggle('modal-status-ok', isOk);
+        head.classList.toggle('modal-status-off', !isOk);
+      }
+
       // Editable fields (logged in)
       setVal('edit-id', d.id);
       setVal('edit-name', d.name);
       setVal('edit-category', d.category);
       setVal('edit-frequency', d.frequency);
-      setVal('edit-payment-method', d.paymentMethod);
+      setPm('edit', d.paymentMethod, d.cardId);
+      setVal('edit-end-date', d.endDate);
       setVal('edit-start-date', d.startDate);
       setVal('edit-notes', d.notes);
       setVal('edit-installments', d.installments);
@@ -70,7 +177,8 @@ document.addEventListener('DOMContentLoaded', function () {
       // Read-only fields (not logged in)
       setText('ro-category', d.category);
       setText('ro-frequency', FREQ_LABELS[d.frequency] || d.frequency);
-      setText('ro-payment-method', d.paymentMethod || '—');
+      setText('ro-payment-method', d.paymentLabel || '—');
+      setText('ro-end-date', d.endDate ? fmtDate(d.endDate) : '—');
       setText('ro-start-date', fmtDate(d.startDate));
       setText('ro-notes', d.notes || '—');
       setText('ro-installments', d.installments || '—');

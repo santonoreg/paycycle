@@ -126,8 +126,11 @@ function computeForecastSpend(array $details, ?string $today = null): array
             if ($remaining !== null && $counted >= $remaining) {
                 break; // δεν υπάρχουν άλλες δόσεις
             }
-            $counted++;
             $dateStr = $cursor->format('Y-m-d');
+            if (!empty($sub['end_date']) && $dateStr > $sub['end_date']) {
+                break; // η συνδρομή έχει λήξει
+            }
+            $counted++;
             if ($dateStr >= $forecastStartStr && $dateStr <= $forecastEndStr) {
                 $ym = substr($dateStr, 0, 7);
                 if (isset($buckets[$ym])) {

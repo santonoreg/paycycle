@@ -7,12 +7,15 @@
  */
 
 const FREQUENCY_KEYS = ['weekly', 'monthly', 'half-yearly', 'yearly', 'biennial', 'triennial'];
-const STATUS_KEYS = ['active', 'trial', 'frozen', 'canceled', 'paid_off'];
+const STATUS_KEYS = ['active', 'trial', 'frozen', 'canceled', 'paid_off', 'expired'];
 
-/** True για συνδρομές/πληρωμές που ΤΡΕΧΟΥΝ ακόμα (δεν είναι ακυρωμένες ούτε εξοφλημένες). */
+/** Πόσες ημέρες πριν τη λήξη εμφανίζεται ειδοποίηση. */
+const EXPIRY_WARNING_DAYS = 30;
+
+/** True για συνδρομές/πληρωμές που ΤΡΕΧΟΥΝ ακόμα (δεν είναι ακυρωμένες, εξοφλημένες ή ληγμένες). */
 function isRunningStatus(string $status): bool
 {
-    return !in_array($status, ['canceled', 'paid_off'], true);
+    return !in_array($status, ['canceled', 'paid_off', 'expired'], true);
 }
 
 /** @return array<string,string> κλειδί συχνότητας => μεταφρασμένη ετικέτα */
@@ -305,7 +308,8 @@ function syncSubscriptionLedgerRows(PDO $pdo, array $sub, array $prices, array $
 function syncAllLedgers(PDO $pdo, ?string $today = null): void
 {
     $today = $today ?? date('Y-m-d');
-    $subs = $pdo->query("SELECT * FROM subscriptions WHERE status != 'canceled'")->fetchAll();
+    expireDueSubscriptions($pdo, $today);
+    $subs = $pdo->query("SELECT * FROM subscriptions WHERE status NOT IN ('canceled', 'expired')")->fetchAll();
     if (empty($subs)) {
         return;
     }
@@ -319,6 +323,57 @@ function syncAllLedgers(PDO $pdo, ?string $today = null): void
         $freezesStmt->execute([$sub['id']]);
         $freezes = $freezesStmt->fetchAll();
         syncSubscriptionLedger($pdo, $sub, $prices, $freezes, $today);
+    }
+}
+
+/**
+ * Διαχείριση λήξης: οι συνδρομές/πληρωμές με ημερομηνία λήξης (end_date) που
+ * έχει περάσει ("σήμερα" > end_date) γίνονται αυτόματα 'expired' (Έληξε).
+ * Πριν κλειδωθούν, καταχωρούνται οι δόσεις μέχρι και την ημερομηνία λήξης —
+ * ποτέ μετά. Η ημερομηνία λήξης κρατιέται και στο canceled_date, ώστε μια
+ * επανενεργοποίηση να μη μετρήσει το διάστημα που έληξε ως πληρωμένο.
+ */
+function expireDueSubscriptions(PDO $pdo, string $today): void
+{
+    $stmt = $pdo->prepare("SELECT * FROM subscriptions WHERE end_date IS NOT NULL AND end_date < ? AND status IN ('active','trial','frozen')");
+    $stmt->execute([$today]);
+    $due = $stmt->fetchAll();
+    if (!$due) {
+        return;
+    }
+    $pricesStmt = $pdo->prepare('SELECT cost, effective_from FROM subscription_prices WHERE subscription_id = ? ORDER BY effective_from ASC, id ASC');
+    $freezesStmt = $pdo->prepare('SELECT frozen_from, frozen_until FROM subscription_freezes WHERE subscription_id = ? ORDER BY frozen_from ASC');
+    foreach ($due as $sub) {
+        $pricesStmt->execute([$sub['id']]);
+        $freezesStmt->execute([$sub['id']]);
+        syncSubscriptionLedgerRows($pdo, $sub, $pricesStmt->fetchAll(), $freezesStmt->fetchAll(), $sub['end_date']);
+        $pdo->prepare("UPDATE subscriptions SET status = 'expired', canceled_date = end_date, updated_at = datetime('now') WHERE id = ?")->execute([$sub['id']]);
+        logActivity($pdo, (int) $sub['id'], $sub['name'], 'expired', ['end_date' => $sub['end_date']], true);
+    }
+}
+
+/**
+ * Επανενεργοποίηση ακυρωμένης ή ληγμένης συνδρομής. Το διάστημα από την
+ * ακύρωση/λήξη μέχρι σήμερα καταγράφεται σαν "πάγωμα" ώστε να μην μετρηθεί ως
+ * πληρωμένο. Ανοιχτά παγώματα κλείνουν (η συνδρομή τρέχει ξανά).
+ */
+function reactivateSubscription(PDO $pdo, array $sub, string $today, bool $clearEndDate = true): void
+{
+    $pdo->beginTransaction();
+    try {
+        $pdo->prepare('UPDATE subscription_freezes SET frozen_until = ? WHERE subscription_id = ? AND frozen_until IS NULL')
+            ->execute([$today, $sub['id']]);
+        if (!empty($sub['canceled_date']) && $sub['canceled_date'] < $today) {
+            $pdo->prepare('INSERT INTO subscription_freezes (subscription_id, frozen_from, frozen_until) VALUES (?,?,?)')
+                ->execute([$sub['id'], $sub['canceled_date'], $today]);
+        }
+        $pdo->prepare("UPDATE subscriptions SET status='active', canceled_date=NULL" . ($clearEndDate ? ', end_date=NULL' : '') . ", updated_at=datetime('now') WHERE id=?")
+            ->execute([$sub['id']]);
+        logActivity($pdo, (int) $sub['id'], $sub['name'], 'reactivated');
+        $pdo->commit();
+    } catch (Throwable $e) {
+        $pdo->rollBack();
+        throw $e;
     }
 }
 
@@ -374,6 +429,10 @@ function computeSubscriptionStats(array $sub, array $prices, array $freezes, arr
         }
         $nextPaymentDate = $cursor->format('Y-m-d');
         $nextPaymentAmount = $variable ? estimateFromPayments($payments, $prices, $nextPaymentDate) : priceAtDate($prices, $nextPaymentDate);
+        if (!empty($sub['end_date']) && $nextPaymentDate > $sub['end_date']) {
+            $nextPaymentDate = null; // η συνδρομή λήγει πριν την επόμενη χρέωση
+            $nextPaymentAmount = null;
+        }
     }
 
     $currentPrice = $variable ? estimateFromPayments($payments, $prices, $today) : priceAtDate($prices, $today);
@@ -506,6 +565,65 @@ function flash(string $type, string $msg): void
     $_SESSION['flash'][] = ['type' => $type, 'msg' => $msg];
 }
 
+/** Τρόποι πληρωμής: μετρητά/κατάθεση ή κάρτα (η κάρτα επιλέγεται από τη λίστα καρτών). */
+const PAYMENT_METHODS = ['cash', 'card'];
+
+/**
+ * Επικυρώνει τον τρόπο πληρωμής μιας φόρμας. Παλιές εγγραφές έχουν ελεύθερο
+ * κείμενο ως τρόπο πληρωμής ($legacy): αν δεν αλλάξει, μένει όπως ήταν.
+ * @return array{0: ?string, 1: ?int, 2: ?string} [payment_method, card_id, μήνυμα σφάλματος]
+ */
+function resolvePaymentMethod(PDO $pdo, string $method, $cardIdRaw, ?string $legacy = null): array
+{
+    $method = trim($method);
+    if ($method === '') {
+        return [null, null, null];
+    }
+    if ($method === 'cash') {
+        return ['cash', null, null];
+    }
+    if ($method === 'card') {
+        $cardId = (int) $cardIdRaw;
+        $stmt = $pdo->prepare('SELECT 1 FROM cards WHERE id = ?');
+        $stmt->execute([$cardId]);
+        return $stmt->fetchColumn() ? ['card', $cardId, null] : [null, null, t('err.card_required')];
+    }
+    if ($legacy !== null && $method === $legacy) {
+        return [$legacy, null, null];
+    }
+    return [null, null, t('err.invalid_payment_method')];
+}
+
+/** @return array<int, array{id:int,name:string,last4:string}> οι κάρτες, με κλειδί το id */
+function getCardsById(PDO $pdo): array
+{
+    $out = [];
+    foreach ($pdo->query('SELECT id, name, last4 FROM cards ORDER BY name COLLATE NOCASE, last4')->fetchAll() as $c) {
+        $out[(int) $c['id']] = $c;
+    }
+    return $out;
+}
+
+function cardLabel(array $card): string
+{
+    return $card['name'] . ' ••••' . $card['last4'];
+}
+
+/** Ετικέτα τρόπου πληρωμής μιας εγγραφής (για λίστα και ιστορικό). */
+function paymentMethodLabel(?string $method, $cardId, array $cardsById): string
+{
+    if ($method === null || $method === '') {
+        return '';
+    }
+    if ($method === 'cash') {
+        return t('pm.cash');
+    }
+    if ($method === 'card') {
+        return isset($cardsById[(int) $cardId]) ? cardLabel($cardsById[(int) $cardId]) : t('pm.card');
+    }
+    return $method; // παλιά ελεύθερη τιμή
+}
+
 /** Όλοι οι διακριτοί τρόποι πληρωμής που υπάρχουν ήδη */
 function getDistinctPaymentMethods(PDO $pdo): array
 {
@@ -519,12 +637,12 @@ function getDistinctPaymentMethods(PDO $pdo): array
  * Καταγράφει ποιος έκανε τι σε μια συνδρομή. Δεν πετά ποτέ exception: αν η
  * καταγραφή αποτύχει, η ίδια η ενέργεια δεν πρέπει να χαλάσει.
  *
- * @param string $action created|edited|price_added|price_deleted|payment_confirmed|frozen|unfrozen|canceled|reactivated|deleted
+ * @param string $action created|edited|price_added|price_deleted|payment_confirmed|frozen|unfrozen|canceled|reactivated|expired|deleted
  */
-function logActivity(PDO $pdo, int $subId, string $subName, string $action, array $details = []): void
+function logActivity(PDO $pdo, int $subId, string $subName, string $action, array $details = [], bool $system = false): void
 {
     try {
-        $u = function_exists('currentUser') ? currentUser() : null;
+        $u = (!$system && function_exists('currentUser')) ? currentUser() : null;
         $pdo->prepare('INSERT INTO subscription_activity (subscription_id, subscription_name, user_id, user_name, action, details, created_at) VALUES (?,?,?,?,?,?,?)')
             ->execute([$subId, $subName, $u['id'] ?? null, $u['username'] ?? null, $action, $details ? json_encode($details, JSON_UNESCAPED_UNICODE) : null, date('Y-m-d H:i:s')]);
     } catch (Throwable $e) {
@@ -549,12 +667,15 @@ function activityText(string $action, array $details): string
         case 'payment_confirmed':
             return t('activity.payment_confirmed', ['amount' => euro((float) $details['amount']), 'date' => fdate($details['date'])]);
         case 'created':
+            return !empty($details['copy_of']) ? t('activity.created_copy', ['name' => $details['copy_of']]) : t('activity.created');
         case 'frozen':
         case 'unfrozen':
         case 'canceled':
         case 'reactivated':
         case 'deleted':
             return t('activity.' . $action);
+        case 'expired':
+            return t('activity.expired', ['date' => fdate($details['end_date'] ?? null)]);
     }
     return $action;
 }
@@ -567,7 +688,7 @@ function activityValue(string $field, $v): string
     if ($field === 'frequency') {
         return t('freq.' . $v);
     }
-    if ($field === 'start_date') {
+    if ($field === 'start_date' || $field === 'end_date') {
         return fdate((string) $v);
     }
     if ($field === 'variable_amount') {
@@ -594,7 +715,7 @@ function getActivityBySubscription(PDO $pdo, array $subIds): array
     $out = [];
     foreach ($pdo->query("SELECT * FROM subscription_activity WHERE subscription_id IN ($in) ORDER BY id DESC")->fetchAll() as $r) {
         $out[(int) $r['subscription_id']][] = [
-            'who'  => $r['user_name'] ?? '—',
+            'who'  => $r['user_name'] ?? t('activity.system'),
             'at'   => fdate(substr($r['created_at'], 0, 10)) . ' ' . substr($r['created_at'], 11, 5),
             'text' => activityText($r['action'], $r['details'] ? (json_decode($r['details'], true) ?: []) : []),
         ];

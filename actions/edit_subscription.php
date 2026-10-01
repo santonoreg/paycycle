@@ -17,7 +17,8 @@ $id = (int) ($_POST['id'] ?? 0);
 $name = trim($_POST['name'] ?? '');
 $category = trim($_POST['category'] ?? '');
 $frequency = $_POST['frequency'] ?? '';
-$paymentMethod = trim($_POST['payment_method'] ?? '') ?: null;
+$postedMethod = (string) ($_POST['payment_method'] ?? '');
+$endDate = trim($_POST['end_date'] ?? '') ?: null; // προαιρετική ημερομηνία λήξης
 $startDate = $_POST['start_date'] ?? '';
 $notes = trim($_POST['notes'] ?? '') ?: null;
 
@@ -27,6 +28,7 @@ if ($name === '') $errors[] = t('err.name_required');
 if ($category === '') $errors[] = t('err.category_required');
 if (!in_array($frequency, FREQUENCY_KEYS, true)) $errors[] = t('err.invalid_frequency');
 if (!DateTime::createFromFormat('Y-m-d', $startDate)) $errors[] = t('err.invalid_start');
+if ($endDate !== null && (!DateTime::createFromFormat('Y-m-d', $endDate) || $endDate < $startDate)) $errors[] = t('err.invalid_end');
 
 // Πλήθος δόσεων (μόνο αν στάλθηκε το πεδίο, δηλαδή για επαναλαμβανόμενες πληρωμές)
 $setInstallments = array_key_exists('installments', $_POST);
@@ -65,10 +67,27 @@ $oldStmt = $pdo->prepare('SELECT * FROM subscriptions WHERE id = ?');
 $oldStmt->execute([$id]);
 $old = $oldStmt->fetch();
 
+[$paymentMethod, $cardId, $pmError] = resolvePaymentMethod($pdo, $postedMethod, $_POST['card_id'] ?? '', $old['payment_method'] ?? null);
+if ($pmError === null && $endDate !== null) {
+    // Η λήξη δεν μπορεί να είναι πριν από πληρωμή που έχει ήδη καταχωρηθεί.
+    $lp = $pdo->prepare('SELECT MAX(payment_date) FROM subscription_payments WHERE subscription_id = ?');
+    $lp->execute([$id]);
+    $lastPayment = $lp->fetchColumn();
+    if ($lastPayment && $endDate < $lastPayment) {
+        $pmError = t('err.end_before_payment', ['date' => fdate($lastPayment)]);
+    }
+}
+if ($pmError !== null) {
+    flash('danger', $pmError);
+    header('Location: ../' . backPage());
+    exit;
+}
+$cardsById = getCardsById($pdo);
+
 // Τι αλλάζει (για το ιστορικό ενεργειών)
 $changes = [];
 if ($old) {
-    $cmp = ['name' => $name, 'category' => $category, 'frequency' => $frequency, 'payment_method' => $paymentMethod, 'start_date' => $startDate, 'notes' => $notes];
+    $cmp = ['name' => $name, 'category' => $category, 'frequency' => $frequency, 'start_date' => $startDate, 'end_date' => $endDate, 'notes' => $notes];
     if ($setInstallments) {
         $cmp['installments'] = $installments;
         $cmp['variable_amount'] = !empty($_POST['variable_amount']) ? 1 : 0;
@@ -78,6 +97,11 @@ if ($old) {
         if ((string) ($oldVal ?? '') !== (string) ($new ?? '')) {
             $changes[] = ['field' => $field, 'old' => $oldVal, 'new' => $new];
         }
+    }
+    $oldPm = paymentMethodLabel($old['payment_method'], $old['card_id'], $cardsById);
+    $newPm = paymentMethodLabel($paymentMethod, $cardId, $cardsById);
+    if ($oldPm !== $newPm) {
+        $changes[] = ['field' => 'payment_method', 'old' => $oldPm, 'new' => $newPm];
     }
     if ($estimate !== null) {
         $lastCost = $pdo->prepare('SELECT cost FROM subscription_prices WHERE subscription_id = ? ORDER BY effective_from DESC, id DESC LIMIT 1');
@@ -89,8 +113,14 @@ if ($old) {
     }
 }
 
-$stmt = $pdo->prepare("UPDATE subscriptions SET name=?, category=?, frequency=?, payment_method=?, start_date=?, notes=?, updated_at=datetime('now') WHERE id=?");
-$stmt->execute([$name, $category, $frequency, $paymentMethod, $startDate, $notes, $id]);
+$stmt = $pdo->prepare("UPDATE subscriptions SET name=?, category=?, frequency=?, payment_method=?, card_id=?, start_date=?, end_date=?, notes=?, updated_at=datetime('now') WHERE id=?");
+$stmt->execute([$name, $category, $frequency, $paymentMethod, $cardId, $startDate, $endDate, $notes, $id]);
+
+// Ληγμένη εγγραφή που της δόθηκε νέα (μελλοντική) ημερομηνία λήξης ή αφαιρέθηκε η λήξη = ανανέωση.
+if ($old && $old['status'] === 'expired' && ($endDate === null || $endDate >= date('Y-m-d'))) {
+    reactivateSubscription($pdo, $old, date('Y-m-d'), false);
+    $renewed = true;
+}
 
 if ($setInstallments) {
     $variableAmount = !empty($_POST['variable_amount']) ? 1 : 0;
@@ -114,6 +144,7 @@ if ($setInstallments) {
 // Αν άλλαξε η συχνότητα ή η ημερομηνία έναρξης, οι καταχωρημένες πληρωμές
 // (που είχαν υπολογιστεί με το παλιό βήμα) δεν ισχύουν πια: ξαναχτίζονται.
 $rebuilt = false;
+$renewed = $renewed ?? false;
 if ($old && $old['status'] !== 'canceled' && ($old['frequency'] !== $frequency || $old['start_date'] !== $startDate)) {
     $pdo->beginTransaction();
     try {
@@ -127,7 +158,7 @@ if ($old && $old['status'] !== 'canceled' && ($old['frequency'] !== $frequency |
         $fr = $pdo->prepare('SELECT frozen_from, frozen_until FROM subscription_freezes WHERE subscription_id = ? ORDER BY frozen_from ASC');
         $fr->execute([$id]);
         $sub = ['id' => $id, 'start_date' => $startDate, 'frequency' => $frequency];
-        syncSubscriptionLedger($pdo, $sub, $pr->fetchAll(), $fr->fetchAll(), date('Y-m-d'));
+        syncSubscriptionLedger($pdo, $sub, $pr->fetchAll(), $fr->fetchAll(), ($endDate !== null && $endDate < date('Y-m-d')) ? $endDate : date('Y-m-d'));
         $restore = $pdo->prepare('UPDATE subscription_payments SET amount = ?, is_estimate = 0 WHERE subscription_id = ? AND payment_date = ?');
         foreach ($confirmedRows as $c) {
             $restore->execute([$c['amount'], $id, $c['payment_date']]);

@@ -262,3 +262,20 @@ a { color: var(--brand); }
   background: var(--gold-tint); color: var(--gold);
 }
 .estimate-input { font-style: italic; border-style: dashed; }
+
+/* ---- Λήξη, κατάσταση στο παράθυρο λεπτομερειών (πράσινο = ενεργή, πορτοκαλί = όχι) ---- */
+:root { --orange: #C2570C; --orange-tint: #FDEBDD; }
+[data-bs-theme="dark"] { --orange: #F2A065; --orange-tint: #3A2410; }
+.status-expired { background: var(--orange-tint); color: var(--orange); }
+.status-pill {
+  display: inline-flex; align-items: center;
+  padding: 0.25em 0.7em; border-radius: 999px;
+  font-size: 0.78rem; font-weight: 600; white-space: nowrap;
+}
+.status-pill:empty { display: none; }
+.status-pill-ok  { background: var(--ok-tint);     color: var(--ok); }
+.status-pill-off { background: var(--orange-tint); color: var(--orange); }
+.modal-header.modal-status-ok  { border-top: 4px solid var(--ok);     border-top-left-radius: inherit; border-top-right-radius: inherit; }
+.modal-header.modal-status-off { border-top: 4px solid var(--orange); border-top-left-radius: inherit; border-top-right-radius: inherit; }
+.js-name-open { cursor: pointer; }
+.js-name-open:hover { text-decoration: underline; }

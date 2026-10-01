@@ -20,7 +20,22 @@ $today = date('Y-m-d');
 $allDetails = getAllSubscriptionsWithDetails($pdo, $today);
 $activityBySub = getActivityBySubscription($pdo, array_map(fn($d) => (int) $d['sub']['id'], $allDetails));
 $categories = getDistinctCategories($pdo);
-$paymentMethods = getDistinctPaymentMethods($pdo);
+$cardsById = getCardsById($pdo);
+
+/** Πεδία "Τρόπος πληρωμής": μετρητά/κατάθεση ή κάρτα (+ επιλογή κάρτας). */
+function renderPaymentMethodFields(string $p, array $cards): void
+{ ?>
+  <label class="form-label" for="<?= $p ?>-pm"><?= te('field.payment_method') ?></label>
+  <select name="payment_method" id="<?= $p ?>-pm" class="form-select js-pm">
+    <option value=""><?= te('pm.none') ?></option>
+    <option value="cash"><?= te('pm.cash') ?></option>
+    <option value="card"><?= te('pm.card') ?></option>
+  </select>
+  <select name="card_id" id="<?= $p ?>-card" class="form-select mt-2 d-none js-card" disabled>
+    <?php foreach ($cards as $c): ?><option value="<?= (int) $c['id'] ?>"><?= htmlspecialchars(cardLabel($c)) ?></option><?php endforeach; ?>
+  </select>
+  <?php if (!$cards): ?><div class="form-text d-none js-card-empty"><a href="cards.php"><?= te('pm.no_cards') ?></a></div><?php endif; ?>
+<?php }
 
 // --- Συγκεντρωτικά (πάντα υπολογισμένα στο σύνολο, ανεξάρτητα από φίλτρα) ----
 // Τα συγκεντρωτικά ακολουθούν το φίλτρο τύπου.
@@ -51,8 +66,10 @@ if (!isset($_GET['category']) && $fCategory !== '' && !in_array($fCategory, $cat
     $fCategory = ''; // η προεπιλεγμένη κατηγορία δεν υπάρχει πια
 }
 $fQuery = trim($_GET['q'] ?? '');
+$fCard = ctype_digit((string) ($_GET['card'] ?? '')) ? (int) $_GET['card'] : 0;
 
-$details = array_values(array_filter($allDetails, function ($d) use ($fStatus, $fCategory, $fQuery, $fType) {
+$details = array_values(array_filter($allDetails, function ($d) use ($fStatus, $fCategory, $fQuery, $fType, $fCard) {
+    if ($fCard > 0 && (int) ($d['sub']['card_id'] ?? 0) !== $fCard) return false;
     if ($fType !== '' && $d['sub']['kind'] !== $fType) return false;
     if ($fStatus !== '' && $d['sub']['status'] !== $fStatus) return false;
     if ($fCategory !== '' && $d['sub']['category'] !== $fCategory) return false;
@@ -110,6 +127,26 @@ require __DIR__ . '/includes/header.php';
   <?= te('idx.rest_of_month') ?>: <strong class="num"><?= euro($upcoming['rest_of_this_month']) ?></strong>
 </div>
 
+<?php
+// Ειδοποίηση: ό,τι λήγει τις επόμενες EXPIRY_WARNING_DAYS ημέρες
+$expiring = [];
+foreach ($allDetails as $d) {
+    $ed = $d['sub']['end_date'] ?? null;
+    if ($ed && in_array($d['sub']['status'], ['active', 'trial', 'frozen'], true)) {
+        $left = daysUntil($ed, $today);
+        if ($left !== null && $left >= 0 && $left <= EXPIRY_WARNING_DAYS) {
+            $expiring[] = ['name' => $d['sub']['name'], 'date' => $ed, 'left' => $left];
+        }
+    }
+}
+usort($expiring, fn($a, $b) => strcmp($a['date'], $b['date']));
+if ($expiring): ?>
+  <div class="alert alert-warning py-2 mb-3">
+    <i class="bi bi-calendar-x"></i> <strong><?= te('exp.banner', ['n' => count($expiring), 'days' => EXPIRY_WARNING_DAYS]) ?></strong>
+    <?= implode(' · ', array_map(fn($e) => htmlspecialchars($e['name']) . ' (' . fdate($e['date']) . ($e['left'] === 0 ? ', ' . t('exp.today') : '') . ')', $expiring)) ?>
+  </div>
+<?php endif; ?>
+
 <?php if ($pendingBills > 0): ?>
   <div class="alert alert-warning py-2 mb-3"><i class="bi bi-hourglass-split"></i> <?= te('var.pending_total', ['n' => $pendingBills]) ?></div>
 <?php endif; ?>
@@ -123,6 +160,14 @@ require __DIR__ . '/includes/header.php';
 <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
   <form class="d-flex flex-wrap gap-2" method="get">
     <input type="hidden" name="type" value="<?= htmlspecialchars($fType) ?>">
+    <?php if ($cardsById): ?>
+    <select name="card" class="form-select form-select-sm" style="width:auto" onchange="this.form.submit()">
+      <option value=""><?= te('filter.all_cards') ?></option>
+      <?php foreach ($cardsById as $c): ?>
+        <option value="<?= (int) $c['id'] ?>" <?= $fCard === (int) $c['id'] ? 'selected' : '' ?>><?= htmlspecialchars(cardLabel($c)) ?></option>
+      <?php endforeach; ?>
+    </select>
+    <?php endif; ?>
     <select name="status" class="form-select form-select-sm" style="width:auto" onchange="this.form.submit()">
       <option value=""><?= te('filter.all_statuses') ?></option>
       <?php foreach (statuses() as $k => $label): ?>
@@ -137,8 +182,8 @@ require __DIR__ . '/includes/header.php';
     </select>
     <input type="search" name="q" value="<?= htmlspecialchars($fQuery) ?>" class="form-control form-control-sm" style="width:auto" placeholder="<?= te('filter.search') ?>">
     <button class="btn btn-sm btn-outline-secondary" type="submit"><i class="bi bi-search"></i></button>
-    <?php if ($fStatus || $fCategory || $fQuery): ?>
-      <a href="<?= basename($_SERVER['SCRIPT_NAME']) ?>?type=<?= htmlspecialchars($fType) ?>&amp;status=&amp;category=" class="btn btn-sm btn-link"><?= te('common.clear') ?></a>
+    <?php if ($fStatus || $fCategory || $fQuery || $fCard): ?>
+      <a href="<?= basename($_SERVER['SCRIPT_NAME']) ?>?type=<?= htmlspecialchars($fType) ?>&amp;status=&amp;category=&amp;card=" class="btn btn-sm btn-link"><?= te('common.clear') ?></a>
     <?php endif; ?>
   </form>
 
@@ -202,8 +247,8 @@ require __DIR__ . '/includes/header.php';
       ?>
         <tr class="<?= $rowClass ?>">
           <td>
-            <div class="sub-name"><?= htmlspecialchars($sub['name']) ?></div>
-            <div class="sub-category"><span class="badge text-bg-light border fw-normal"><?= te('kind.' . $sub['kind']) ?></span> <?= htmlspecialchars($sub['category']) ?><?php if (!empty($sub['created_by_name'])): ?> · <span title="<?= te('field.added_by') ?>"><i class="bi bi-person"></i> <?= htmlspecialchars($sub['created_by_name']) ?></span><?php endif; ?></div>
+            <div class="sub-name js-name-open" role="button" tabindex="0"><?= htmlspecialchars($sub['name']) ?></div>
+            <div class="sub-category"><span class="badge text-bg-light border fw-normal"><?= te('kind.' . $sub['kind']) ?></span> <?= htmlspecialchars($sub['category']) ?><?php if (($sub['payment_method'] ?? '') === 'card' && isset($cardsById[(int) $sub['card_id']])): ?> · <span title="<?= te('field.payment_method') ?>"><i class="bi bi-credit-card"></i> ••••<?= htmlspecialchars($cardsById[(int) $sub['card_id']]['last4']) ?></span><?php endif; ?><?php if (!empty($sub['created_by_name'])): ?> · <span title="<?= te('field.added_by') ?>"><i class="bi bi-person"></i> <?= htmlspecialchars($sub['created_by_name']) ?></span><?php endif; ?></div>
           </td>
           <td class="num"><?= $stats['is_variable'] ? '≈ ' : '' ?><?= euro($stats['current_price']) ?><div class="sub-category"><?= te('freq.' . $sub['frequency']) ?><?= $stats['is_variable'] ? ' · ' . te('list.variable') : '' ?></div></td>
           <td class="num"><?= euro($stats['monthly_equivalent']) ?></td>
@@ -227,13 +272,21 @@ require __DIR__ . '/includes/header.php';
           <td class="text-end num"><?= euro($stats['total_paid']) ?></td>
           <td>
             <span class="status-badge status-<?= $sub['status'] ?>"><?= te('status.' . $sub['status']) ?></span>
+            <?php if (!empty($sub['end_date'])):
+                $leftDays = daysUntil($sub['end_date'], $today); ?>
+              <div class="sub-category <?= ($sub['status'] !== 'expired' && $leftDays !== null && $leftDays >= 0 && $leftDays <= EXPIRY_WARNING_DAYS) ? 'next-soon' : '' ?>">
+                <i class="bi bi-calendar-x"></i> <?= $sub['status'] === 'expired' ? te('exp.expired_on', ['date' => fdate($sub['end_date'])]) : te('exp.ends_on', ['date' => fdate($sub['end_date'])]) ?>
+              </div>
+            <?php endif; ?>
             <?php if ($stats['estimates_pending'] > 0 && $sub['status'] !== 'canceled'): ?>
               <div><span class="awaiting-badge" title="<?= te('var.badge_hint') ?>"><i class="bi bi-hourglass-split"></i> <?= te('var.pending_short', ['n' => $stats['estimates_pending']]) ?></span></div>
             <?php endif; ?>
           </td>
           <td class="text-end">
-            <div class="d-flex gap-1 justify-content-end">
-              <button type="button" class="btn btn-sm btn-outline-primary action-icon-btn" data-bs-toggle="modal" data-bs-target="#detailsModal"
+            <div class="dropdown d-inline-block">
+              <button class="btn btn-sm btn-outline-secondary action-icon-btn" data-bs-toggle="dropdown" aria-label="<?= te('menu.actions') ?>"><i class="bi bi-three-dots-vertical"></i></button>
+              <ul class="dropdown-menu dropdown-menu-end">
+                <li><button type="button" class="dropdown-item js-open-details" data-bs-toggle="modal" data-bs-target="#detailsModal"
                 data-id="<?= $sub['id'] ?>"
                 data-kind="<?= $sub['kind'] ?>"
                 data-name="<?= htmlspecialchars($sub['name']) ?>"
@@ -252,13 +305,13 @@ require __DIR__ . '/includes/header.php';
                 data-freezes='<?= $freezesJson ?>'
                 data-activity='<?= $activityJson ?>'
                 data-payments='<?= $paymentsJson ?>'
-                title="<?= $loggedIn ? te('title.edit') : te('title.details') ?>">
-                <i class="bi bi-<?= $loggedIn ? 'pencil' : 'info-circle' ?>"></i>
-              </button>
-              <?php if ($loggedIn): ?>
-              <div class="dropdown">
-                <button class="btn btn-sm btn-outline-secondary action-icon-btn" data-bs-toggle="dropdown"><i class="bi bi-three-dots-vertical"></i></button>
-                <ul class="dropdown-menu dropdown-menu-end">
+                data-end-date="<?= htmlspecialchars($sub['end_date'] ?? '') ?>"
+                data-card-id="<?= (int) ($sub['card_id'] ?? 0) ?: '' ?>"
+                data-payment-label="<?= htmlspecialchars(paymentMethodLabel($sub['payment_method'] ?? null, $sub['card_id'] ?? null, $cardsById)) ?>">
+                  <i class="bi bi-<?= $loggedIn ? 'pencil-square' : 'info-circle' ?> me-2"></i><?= $loggedIn ? te('menu.details_edit') : te('title.details') ?></button></li>
+                <?php if ($loggedIn): ?>
+                <li><button type="button" class="dropdown-item js-duplicate"><i class="bi bi-copy me-2"></i><?= te('menu.duplicate') ?></button></li>
+                <li><hr class="dropdown-divider"></li>
                   <?php if (in_array($sub['status'], ['active', 'trial'], true)): ?>
                     <li>
                       <form method="post" action="actions/freeze.php">
@@ -282,7 +335,7 @@ require __DIR__ . '/includes/header.php';
                         <button type="submit" class="dropdown-item text-danger"><i class="bi bi-x-circle me-2"></i><?= te('menu.cancel') ?></button>
                       </form>
                     </li>
-                  <?php elseif ($sub['status'] === 'canceled'): ?>
+                  <?php elseif (in_array($sub['status'], ['canceled', 'expired'], true)): ?>
                     <li>
                       <form method="post" action="actions/reactivate.php">
                         <?= csrfField() ?><input type="hidden" name="id" value="<?= $sub['id'] ?>">
@@ -297,9 +350,8 @@ require __DIR__ . '/includes/header.php';
                       <button type="submit" class="dropdown-item text-danger"><i class="bi bi-trash me-2"></i><?= te('menu.delete') ?></button>
                     </form>
                   </li>
+                <?php endif; ?>
                 </ul>
-              </div>
-              <?php endif; ?>
             </div>
           </td>
         </tr>
@@ -315,13 +367,15 @@ require __DIR__ . '/includes/header.php';
 <div class="modal fade" id="addModal" tabindex="-1">
   <div class="modal-dialog">
     <div class="modal-content">
-      <form method="post" action="actions/add_subscription.php">
+      <form method="post" action="actions/add_subscription.php" id="addForm">
         <?= csrfField() ?>
+        <input type="hidden" name="copy_from" id="add-copy-from" value="">
         <div class="modal-header">
-          <h5 class="modal-title"><i class="bi bi-plus-lg"></i> <?= te('modal.new_sub') ?></h5>
+          <h5 class="modal-title"><i class="bi bi-plus-lg"></i> <span id="addModalTitleText"><?= te('modal.new_sub') ?></span></h5>
           <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
         </div>
         <div class="modal-body">
+          <div class="alert alert-info py-2 small d-none" id="dup-hint"></div>
           <div class="mb-3">
             <label class="form-label"><?= te('field.type') ?></label>
             <select name="kind" id="add-kind" class="form-select">
@@ -340,8 +394,7 @@ require __DIR__ . '/includes/header.php';
               <input type="text" name="category" class="form-control" list="categories-list" required>
             </div>
             <div class="col-6 mb-3">
-              <label class="form-label"><?= te('field.payment_method') ?></label>
-              <input type="text" name="payment_method" class="form-control" list="payment-methods-list">
+              <?php renderPaymentMethodFields('add', $cardsById); ?>
             </div>
           </div>
           <div class="row">
@@ -370,6 +423,11 @@ require __DIR__ . '/includes/header.php';
                 <option value="trial"><?= te('status.trial') ?></option>
               </select>
             </div>
+          </div>
+          <div class="mb-3">
+            <label class="form-label" for="add-end-date"><?= te('field.end_date') ?></label>
+            <input type="date" name="end_date" id="add-end-date" class="form-control">
+            <div class="form-text"><?= te('field.end_date_help') ?></div>
           </div>
           <div class="rec-only">
             <div class="mb-3">
@@ -401,9 +459,6 @@ require __DIR__ . '/includes/header.php';
 <datalist id="categories-list">
   <?php foreach ($categories as $c): ?><option value="<?= htmlspecialchars($c) ?>"><?php endforeach; ?>
 </datalist>
-<datalist id="payment-methods-list">
-  <?php foreach ($paymentMethods as $p): ?><option value="<?= htmlspecialchars($p) ?>"><?php endforeach; ?>
-</datalist>
 
 <!-- ===================== Modal: Λεπτομέρειες / Επεξεργασία ===================== -->
 <div class="modal fade" id="detailsModal" tabindex="-1">
@@ -411,6 +466,7 @@ require __DIR__ . '/includes/header.php';
     <div class="modal-content">
       <div class="modal-header">
         <h5 class="modal-title" id="detailsModalTitle"><?= te('modal.default_title') ?></h5>
+        <span class="status-pill ms-2" id="detailsStatus"></span>
         <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
       </div>
       <div class="modal-body">
@@ -438,8 +494,7 @@ require __DIR__ . '/includes/header.php';
                     <input type="text" name="category" id="edit-category" class="form-control" list="categories-list" required>
                   </div>
                   <div class="col-6 mb-3">
-                    <label class="form-label"><?= te('field.payment_method') ?></label>
-                    <input type="text" name="payment_method" id="edit-payment-method" class="form-control" list="payment-methods-list">
+                    <?php renderPaymentMethodFields('edit', $cardsById); ?>
                   </div>
                 </div>
                 <div class="row">
@@ -455,6 +510,11 @@ require __DIR__ . '/includes/header.php';
                     <label class="form-label"><?= te('field.start_date') ?></label>
                     <input type="date" name="start_date" id="edit-start-date" class="form-control" required>
                   </div>
+                </div>
+                <div class="mb-3">
+                  <label class="form-label" for="edit-end-date"><?= te('field.end_date') ?></label>
+                  <input type="date" name="end_date" id="edit-end-date" class="form-control">
+                  <div class="form-text"><?= te('field.end_date_help') ?></div>
                 </div>
                 <div class="rec-only">
                   <div class="mb-3">
@@ -485,6 +545,7 @@ require __DIR__ . '/includes/header.php';
                 <dt class="col-4"><?= te('field.frequency') ?></dt><dd class="col-8" id="ro-frequency"></dd>
                 <dt class="col-4"><?= te('field.payment_method') ?></dt><dd class="col-8" id="ro-payment-method"></dd>
                 <dt class="col-4"><?= te('field.start_date') ?></dt><dd class="col-8" id="ro-start-date"></dd>
+                <dt class="col-4"><?= te('field.end_date') ?></dt><dd class="col-8" id="ro-end-date"></dd>
                 <div class="col-12 rec-only"><div class="row">
                   <dt class="col-4"><?= te('field.installments') ?></dt><dd class="col-8" id="ro-installments"></dd>
                 </div></div>

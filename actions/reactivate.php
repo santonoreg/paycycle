@@ -21,26 +21,15 @@ $stmt = $pdo->prepare('SELECT * FROM subscriptions WHERE id=?');
 $stmt->execute([$id]);
 $sub = $stmt->fetch();
 
-if (!$sub || $sub['status'] !== 'canceled') {
+if (!$sub || !in_array($sub['status'], ['canceled', 'expired'], true)) {
     flash('warning', t('msg.not_canceled'));
     header('Location: ../' . backPage());
     exit;
 }
 
-$today = date('Y-m-d');
-$pdo->beginTransaction();
 try {
-    // Το διάστημα από την ακύρωση μέχρι σήμερα δεν είχε πραγματικές χρεώσεις —
-    // το καταγράφουμε σαν "πάγωμα" ώστε το sync να μην το μετρήσει ως πληρωμένο.
-    if (!empty($sub['canceled_date']) && $sub['canceled_date'] < $today) {
-        $pdo->prepare('INSERT INTO subscription_freezes (subscription_id, frozen_from, frozen_until) VALUES (?,?,?)')
-            ->execute([$id, $sub['canceled_date'], $today]);
-    }
-    $pdo->prepare("UPDATE subscriptions SET status='active', canceled_date=NULL, updated_at=datetime('now') WHERE id=?")->execute([$id]);
-    logActivity($pdo, $id, $sub['name'], 'reactivated');
-    $pdo->commit();
+    reactivateSubscription($pdo, $sub, date('Y-m-d'));
 } catch (Throwable $e) {
-    $pdo->rollBack();
     flash('danger', t('msg.error', ['error' => $e->getMessage()]));
     header('Location: ../' . backPage());
     exit;
