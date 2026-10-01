@@ -113,6 +113,31 @@ document.addEventListener('DOMContentLoaded', function () {
     });
   }
 
+  // --- Ομαδοποίηση: το + / − ανοίγει και κλείνει την ομάδα ---
+  function setGroupOpen(row, open) {
+    var id = row.getAttribute('data-group-row');
+    document.querySelectorAll('tr[data-group="' + id + '"]').forEach(function (r) { r.classList.toggle('d-none', !open); });
+    row.setAttribute('aria-expanded', open ? 'true' : 'false');
+    var icon = row.querySelector('.group-icon');
+    if (icon) {
+      icon.classList.toggle('bi-plus-square', !open);
+      icon.classList.toggle('bi-dash-square', open);
+    }
+  }
+  document.querySelectorAll('.group-row').forEach(function (row) {
+    function toggle() { setGroupOpen(row, row.getAttribute('aria-expanded') !== 'true'); }
+    row.addEventListener('click', toggle);
+    row.addEventListener('keydown', function (e) {
+      if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); toggle(); }
+    });
+  });
+  document.querySelectorAll('[data-group-all]').forEach(function (btn) {
+    btn.addEventListener('click', function () {
+      var open = btn.getAttribute('data-group-all') === 'open';
+      document.querySelectorAll('.group-row').forEach(function (row) { setGroupOpen(row, open); });
+    });
+  });
+
   // --- Μηνύματα (toast): εμφανίζονται και εξαφανίζονται μόνα τους ---
   document.querySelectorAll('.toast-container .toast').forEach(function (el) {
     bootstrap.Toast.getOrCreateInstance(el).show();

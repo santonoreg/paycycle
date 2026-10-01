@@ -190,6 +190,7 @@ Every time a subscription is "charged" (monthly/yearly/etc.), the app
   in the **...** menu; clicking the name also opens the details.
 - **Messages** appear as toasts that disappear after a few seconds.
 - **Theme:** the three buttons next to the language menu switch between light, dark and automatic (follows the device); remembered per browser in a cookie.
+- **Grouping:** the *Group by* selector (User / Card / Payment category / Payment type) puts the rows into groups with a count and the monthly cost of the active ones. Click a group (+) to open it (−); there are also expand/collapse-all buttons. With no grouping selected the list looks as before.
 - **Page width:** the switch next to the language menu toggles full width or boxed (max 1500px); it is remembered per browser in a cookie.
 
 ## 6. Languages and Settings

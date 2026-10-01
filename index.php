@@ -12,6 +12,7 @@ require __DIR__ . '/includes/stats_helpers.php';
 // διατύπωση του δικού της τύπου στα μηνύματα επιβεβαίωσης.
 $fType = in_array($_GET['type'] ?? '', KINDS, true) ? $_GET['type'] : '';
 const PAGE_KIND = 'recurring';
+const GROUP_KEYS = ['user', 'card', 'category', 'kind'];
 setKind(PAGE_KIND);
 
 $pdo = getDb();
@@ -66,6 +67,7 @@ if (!isset($_GET['category']) && $fCategory !== '' && !in_array($fCategory, $cat
     $fCategory = ''; // η προεπιλεγμένη κατηγορία δεν υπάρχει πια
 }
 $fQuery = trim($_GET['q'] ?? '');
+$fGroup = in_array($_GET['group'] ?? '', GROUP_KEYS, true) ? $_GET['group'] : '';
 $fCard = ctype_digit((string) ($_GET['card'] ?? '')) ? (int) $_GET['card'] : 0;
 
 $details = array_values(array_filter($allDetails, function ($d) use ($fStatus, $fCategory, $fQuery, $fType, $fCard) {
@@ -79,7 +81,7 @@ $details = array_values(array_filter($allDetails, function ($d) use ($fStatus, $
 
 // --- Ταξινόμηση: ενεργές/δοκιμαστικές πρώτα (κατά επόμενη πληρωμή), μετά
 //     παγωμένες, μετά ακυρωμένες — μέσα σε κάθε ομάδα, αλφαβητικά ---------
-$statusPriority = ['active' => 0, 'trial' => 0, 'frozen' => 1, 'canceled' => 2, 'paid_off' => 2];
+$statusPriority = ['active' => 0, 'trial' => 0, 'frozen' => 1, 'canceled' => 2, 'paid_off' => 2, 'expired' => 2];
 usort($details, function ($a, $b) use ($statusPriority) {
     $pa = $statusPriority[$a['sub']['status']];
     $pb = $statusPriority[$b['sub']['status']];
@@ -91,6 +93,41 @@ usort($details, function ($a, $b) use ($statusPriority) {
     }
     return strcasecmp($a['sub']['name'], $b['sub']['name']);
 });
+
+// --- Ομαδοποίηση (προαιρετική): user | card | category | kind ------------------
+// Χωρίς επιλογή η λίστα εμφανίζεται όπως είναι. Με επιλογή, οι γραμμές μπαίνουν σε
+// ομάδες που ανοίγουν/κλείνουν με το + / −.
+$groupLabels = [];   // κλειδί ομάδας => ετικέτα
+$groupStats = [];    // κλειδί ομάδας => ['count' => n, 'monthly' => άθροισμα ενεργών]
+$groupOf = function (array $d) use ($fGroup, $cardsById): array {
+    $sub = $d['sub'];
+    switch ($fGroup) {
+        case 'user':
+            $n = trim((string) ($sub['created_by_name'] ?? ''));
+            return $n === '' ? ['~', t('group.no_user')] : ['u:' . mb_strtolower($n), $n];
+        case 'card':
+            $cid = (int) ($sub['card_id'] ?? 0);
+            return isset($cardsById[$cid]) ? ['c:' . $cid, cardLabel($cardsById[$cid])] : ['~', t('group.no_card')];
+        case 'category':
+            return ['k:' . mb_strtolower($sub['category']), $sub['category']];
+        default: // kind
+            return ['t:' . $sub['kind'], t('kind.' . $sub['kind'] . '_pl')];
+    }
+};
+if ($fGroup !== '') {
+    foreach ($details as $i => $d) {
+        [$gk, $gl] = $groupOf($d);
+        $details[$i]['_g'] = $gk;
+        $groupLabels[$gk] = $gl;
+        $groupStats[$gk]['count'] = ($groupStats[$gk]['count'] ?? 0) + 1;
+        $groupStats[$gk]['monthly'] = ($groupStats[$gk]['monthly'] ?? 0.0) + (isRunningStatus($d['sub']['status']) ? $d['stats']['monthly_equivalent'] : 0.0);
+    }
+    // Σειρά ομάδων: αλφαβητικά, με το "χωρίς ..." τελευταίο· μέσα στην ομάδα μένει η ταξινόμηση της λίστας
+    $order = array_keys($groupLabels);
+    usort($order, fn($a, $b) => ($a === '~') <=> ($b === '~') ?: strcasecmp($groupLabels[$a], $groupLabels[$b]));
+    $rank = array_flip($order);
+    usort($details, fn($a, $b) => $rank[$a['_g']] <=> $rank[$b['_g']]); // usort δεν είναι stable πριν την PHP 8.0· η 8.x είναι
+}
 
 $pageTitle = t('page.subscriptions');
 $loggedIn = isLoggedIn();
@@ -153,7 +190,7 @@ if ($expiring): ?>
 
 <ul class="nav nav-pills mb-3">
   <?php foreach (['' => t('type.all'), 'subscription' => t('kind.subscription_pl'), 'recurring' => t('kind.recurring_pl')] as $tk => $tl): ?>
-    <li class="nav-item"><a class="nav-link py-1 <?= $fType === $tk ? 'active' : '' ?>" href="index.php<?= $tk !== '' ? '?type=' . $tk : '' ?>"><?= htmlspecialchars($tl) ?></a></li>
+    <li class="nav-item"><a class="nav-link py-1 <?= $fType === $tk ? 'active' : '' ?>" href="index.php?type=<?= $tk ?><?= $fGroup !== '' ? '&amp;group=' . $fGroup : '' ?>"><?= htmlspecialchars($tl) ?></a></li>
   <?php endforeach; ?>
 </ul>
 
@@ -180,10 +217,22 @@ if ($expiring): ?>
         <option value="<?= htmlspecialchars($c) ?>" <?= $fCategory === $c ? 'selected' : '' ?>><?= htmlspecialchars($c) ?></option>
       <?php endforeach; ?>
     </select>
+    <select name="group" class="form-select form-select-sm" style="width:auto" onchange="this.form.submit()" title="<?= te('group.label') ?>" aria-label="<?= te('group.label') ?>">
+      <option value=""><?= te('group.none') ?></option>
+      <?php foreach (GROUP_KEYS as $gk): ?>
+        <option value="<?= $gk ?>" <?= $fGroup === $gk ? 'selected' : '' ?>><?= te('group.by_' . $gk) ?></option>
+      <?php endforeach; ?>
+    </select>
+    <?php if ($fGroup !== ''): ?>
+      <div class="btn-group btn-group-sm" role="group">
+        <button type="button" class="btn btn-outline-secondary" data-group-all="open" title="<?= te('group.expand_all') ?>"><i class="bi bi-plus-square"></i></button>
+        <button type="button" class="btn btn-outline-secondary" data-group-all="close" title="<?= te('group.collapse_all') ?>"><i class="bi bi-dash-square"></i></button>
+      </div>
+    <?php endif; ?>
     <input type="search" name="q" value="<?= htmlspecialchars($fQuery) ?>" class="form-control form-control-sm" style="width:auto" placeholder="<?= te('filter.search') ?>">
     <button class="btn btn-sm btn-outline-secondary" type="submit"><i class="bi bi-search"></i></button>
     <?php if ($fStatus || $fCategory || $fQuery || $fCard): ?>
-      <a href="<?= basename($_SERVER['SCRIPT_NAME']) ?>?type=<?= htmlspecialchars($fType) ?>&amp;status=&amp;category=&amp;card=" class="btn btn-sm btn-link"><?= te('common.clear') ?></a>
+      <a href="<?= basename($_SERVER['SCRIPT_NAME']) ?>?type=<?= htmlspecialchars($fType) ?>&amp;status=&amp;category=&amp;card=<?= $fGroup !== '' ? '&amp;group=' . $fGroup : '' ?>" class="btn btn-sm btn-link"><?= te('common.clear') ?></a>
     <?php endif; ?>
   </form>
 
@@ -223,8 +272,19 @@ if ($expiring): ?>
         </tr>
       </thead>
       <tbody>
-      <?php foreach ($details as $d):
+      <?php $lastGroup = null; $gIndex = 0; foreach ($details as $d):
         $sub = $d['sub']; $stats = $d['stats'];
+        if ($fGroup !== '' && $d['_g'] !== $lastGroup):
+            $lastGroup = $d['_g']; $gIndex++; ?>
+        <tr class="group-row" data-group-row="g<?= $gIndex ?>" role="button" tabindex="0" aria-expanded="false">
+          <td colspan="9">
+            <i class="bi bi-plus-square group-icon"></i>
+            <span class="fw-semibold"><?= htmlspecialchars($groupLabels[$lastGroup]) ?></span>
+            <span class="badge text-bg-secondary ms-1"><?= (int) $groupStats[$lastGroup]['count'] ?></span>
+            <span class="text-muted small ms-2"><?= te('group.monthly') ?>: <span class="num"><?= euro($groupStats[$lastGroup]['monthly']) ?></span></span>
+          </td>
+        </tr>
+        <?php endif;
         setKind($sub['kind']); // διατύπωση μηνυμάτων ανά τύπο (συνδρομή / πληρωμή)
         $days = daysUntil($stats['next_payment_date'], $today);
         $rowClass = !isRunningStatus($sub['status']) ? 'row-ended row-ended-' . $sub['status'] : '';
@@ -245,7 +305,7 @@ if ($expiring): ?>
             'amount' => (float) $p['amount'], 'payment_date' => $p['payment_date'], 'is_estimate' => (int) $p['is_estimate'],
         ], $d['payments'])), ENT_QUOTES);
       ?>
-        <tr class="<?= $rowClass ?>">
+        <tr class="<?= $rowClass ?><?= $fGroup !== '' ? ' group-child d-none' : '' ?>"<?= $fGroup !== '' ? ' data-group="g' . $gIndex . '"' : '' ?>>
           <td>
             <div class="sub-name js-name-open" role="button" tabindex="0"><?= htmlspecialchars($sub['name']) ?></div>
             <div class="sub-category"><?php if (($sub['payment_method'] ?? '') === 'card' && isset($cardsById[(int) $sub['card_id']])): ?><span title="<?= te('field.payment_method') ?>"><i class="bi bi-credit-card"></i> ••••<?= htmlspecialchars($cardsById[(int) $sub['card_id']]['last4']) ?></span><?php endif; ?><?php if (!empty($sub['created_by_name'])): ?><?= ($sub['payment_method'] ?? '') === 'card' && isset($cardsById[(int) $sub['card_id']]) ? ' · ' : '' ?><span title="<?= te('field.added_by') ?>"><i class="bi bi-person"></i> <?= htmlspecialchars($sub['created_by_name']) ?></span><?php endif; ?></div>

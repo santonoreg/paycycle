@@ -361,4 +361,17 @@ return [
     'nav.theme_light' => 'Light',
     'nav.theme_dark' => 'Dark',
     'nav.theme_auto' => 'Automatic (follow the device)',
+
+    // Grouping
+    'group.label' => 'Group by',
+    'group.none' => 'No grouping',
+    'group.by_user' => 'Group by: User',
+    'group.by_card' => 'Group by: Card',
+    'group.by_category' => 'Group by: Payment category',
+    'group.by_kind' => 'Group by: Payment type',
+    'group.no_card' => 'No card',
+    'group.no_user' => 'Unknown user',
+    'group.expand_all' => 'Expand all',
+    'group.collapse_all' => 'Collapse all',
+    'group.monthly' => 'Monthly cost of active',
 ];

@@ -304,3 +304,8 @@ a { color: var(--brand); }
 /* ---- Διάταξη: πλήρες πλάτος (προεπιλογή) ή περιορισμένο ("boxed") ---- */
 .layout-boxed .container-fluid { max-width: 1500px; margin-left: auto; margin-right: auto; }
 .layout-toggle .btn.active, .theme-toggle .btn.active { background: rgba(255, 255, 255, 0.9); color: var(--brand-dark); border-color: transparent; }
+
+/* ---- Ομαδοποίηση λίστας ---- */
+.subs-table tbody tr.group-row td { background: var(--surface-2); cursor: pointer; border-bottom: 1px solid var(--border); }
+.subs-table tbody tr.group-row:hover td { background: var(--brand-tint); }
+.group-icon { color: var(--brand); margin-right: 0.4rem; }

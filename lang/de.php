@@ -350,4 +350,17 @@ return [
     'nav.theme_light' => 'Hell',
     'nav.theme_dark' => 'Dunkel',
     'nav.theme_auto' => 'Automatisch (folgt dem Gerät)',
+
+    // Grouping
+    'group.label' => 'Gruppieren',
+    'group.none' => 'Keine Gruppierung',
+    'group.by_user' => 'Gruppieren nach: Benutzer',
+    'group.by_card' => 'Gruppieren nach: Karte',
+    'group.by_category' => 'Gruppieren nach: Zahlungsart (Kategorie)',
+    'group.by_kind' => 'Gruppieren nach: Zahlungstyp',
+    'group.no_card' => 'Keine Karte',
+    'group.no_user' => 'Unbekannter Benutzer',
+    'group.expand_all' => 'Alle öffnen',
+    'group.collapse_all' => 'Alle schließen',
+    'group.monthly' => 'Monatliche Kosten (aktiv)',
 ];

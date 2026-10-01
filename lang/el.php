@@ -361,4 +361,17 @@ return [
     'nav.theme_light' => 'Φωτεινό',
     'nav.theme_dark' => 'Σκούρο',
     'nav.theme_auto' => 'Αυτόματο (ακολουθεί τη συσκευή)',
+
+    // Grouping
+    'group.label' => 'Ομαδοποίηση',
+    'group.none' => 'Χωρίς ομαδοποίηση',
+    'group.by_user' => 'Ομαδοποίηση: Χρήστης',
+    'group.by_card' => 'Ομαδοποίηση: Κάρτα',
+    'group.by_category' => 'Ομαδοποίηση: Είδος πληρωμής',
+    'group.by_kind' => 'Ομαδοποίηση: Τύπος πληρωμής',
+    'group.no_card' => 'Χωρίς κάρτα',
+    'group.no_user' => 'Άγνωστος χρήστης',
+    'group.expand_all' => 'Άνοιγμα όλων',
+    'group.collapse_all' => 'Κλείσιμο όλων',
+    'group.monthly' => 'Μηνιαίο κόστος ενεργών',
 ];
