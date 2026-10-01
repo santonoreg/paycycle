@@ -232,10 +232,10 @@ return [
     'msg.sub_reactivated@rec' => 'The recurring payment "{name}" was reactivated. The period it was canceled does not count as paid.',
 
     // Δόσεις
-    'status.paid_off' => 'Paid off',
+    'status.paid_off' => 'Completed',
     'field.installments' => 'Number of installments',
     'field.installments_ph' => 'Optional, e.g. 12',
-    'field.installments_help' => 'Leave empty if there is no fixed end. When the last installment date passes, the payment is marked as "Paid off".',
+    'field.installments_help' => 'Leave empty if there is no fixed end. When the last installment date passes, the payment is marked as "Completed".',
     'inst.remaining' => '{n} remaining',
     'err.invalid_installments' => 'Invalid number of installments.',
     // Μεταβλητά ποσά

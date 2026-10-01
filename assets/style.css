@@ -129,7 +129,7 @@ a { color: var(--brand); }
   border-bottom: 1px solid var(--border);
 }
 .subs-table tbody tr:hover { background: var(--surface-2); }
-.subs-table tbody tr.row-canceled { opacity: 0.62; }
+.subs-table tbody tr.row-ended { opacity: 0.88; }
 .subs-table .sub-name { font-weight: 600; color: var(--text); }
 .subs-table .sub-category { color: var(--text-muted); font-size: 0.82rem; }
 
@@ -252,7 +252,7 @@ a { color: var(--brand); }
 }
 
 /* ---- Κατάσταση "Εξοφλήθη" ------------------------------------------------- */
-.status-paid_off { background: var(--surface-2); color: var(--text-muted); border: 1px solid var(--border); }
+.status-paid_off { background: var(--done-tint); color: var(--done); }
 
 /* ---- Μεταβλητά ποσά (λογαριασμοί) ------------------------------------------- */
 .awaiting-badge {
@@ -279,3 +279,13 @@ a { color: var(--brand); }
 .modal-header.modal-status-off { border-top: 4px solid var(--orange); border-top-left-radius: inherit; border-top-right-radius: inherit; }
 .js-name-open { cursor: pointer; }
 .js-name-open:hover { text-decoration: underline; }
+
+/* ---- Εγγραφές που δεν τρέχουν πια: κάθε κατάσταση με δικό της χρώμα γραμμής ---- */
+:root { --done: #2F7A8C; --done-tint: #E3F1F4; }
+[data-bs-theme="dark"] { --done: #6FB5C6; --done-tint: #16303A; }
+.subs-table tbody tr.row-ended-canceled { --bs-table-bg: var(--canceled-tint); }
+.subs-table tbody tr.row-ended-expired  { --bs-table-bg: var(--orange-tint); }
+.subs-table tbody tr.row-ended-paid_off { --bs-table-bg: var(--done-tint); }
+.subs-table tbody tr.row-ended-canceled td:first-child { border-left: 4px solid var(--canceled); }
+.subs-table tbody tr.row-ended-expired  td:first-child { border-left: 4px solid var(--orange); }
+.subs-table tbody tr.row-ended-paid_off td:first-child { border-left: 4px solid var(--done); }

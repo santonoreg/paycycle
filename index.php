@@ -227,7 +227,7 @@ if ($expiring): ?>
         $sub = $d['sub']; $stats = $d['stats'];
         setKind($sub['kind']); // διατύπωση μηνυμάτων ανά τύπο (συνδρομή / πληρωμή)
         $days = daysUntil($stats['next_payment_date'], $today);
-        $rowClass = !isRunningStatus($sub['status']) ? 'row-canceled' : '';
+        $rowClass = !isRunningStatus($sub['status']) ? 'row-ended row-ended-' . $sub['status'] : '';
         $pricesJson = htmlspecialchars(json_encode(array_map(fn($p) => [
             'id' => (int) $p['id'], 'cost' => (float) $p['cost'], 'effective_from' => $p['effective_from'],
             'deletable' => $p['deletable'],

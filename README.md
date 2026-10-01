@@ -156,7 +156,7 @@ Every time a subscription is "charged" (monthly/yearly/etc.), the app
   A recurring payment can have an optional **number of installments** (e.g. a
   12-month loan). The list then shows `paid / total` with the remaining count,
   the forecast stops after the last installment, and once the last installment
-  date has passed the status automatically becomes **Paid off** (Εξοφλήθη).
+  date has passed the status automatically becomes **Completed** (Ολοκληρωμένη).
   Raising the number of installments later reactivates it.
   In the totals and charts, a payment with a fixed number of installments counts
   its plan total spread over the year: a purchase of 3 installments of €46.33
