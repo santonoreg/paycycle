@@ -189,7 +189,7 @@ Every time a subscription is "charged" (monthly/yearly/etc.), the app
 - **Row menu:** all row actions (details/edit, duplicate, freeze, cancel, delete...) are
   in the **...** menu; clicking the name also opens the details.
 - **Messages** appear as toasts that disappear after a few seconds.
-- **Page width:** the switch next to the language menu toggles full width or boxed (max 1200px); it is remembered per browser in a cookie.
+- **Page width:** the switch next to the language menu toggles full width or boxed (max 1500px); it is remembered per browser in a cookie.
 
 ## 6. Languages and Settings
 

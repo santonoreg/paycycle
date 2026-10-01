@@ -302,5 +302,5 @@ a { color: var(--brand); }
 .tag-category     { background: var(--surface-2);  color: var(--text-muted); border-color: var(--border); }
 
 /* ---- Διάταξη: πλήρες πλάτος (προεπιλογή) ή περιορισμένο ("boxed") ---- */
-.layout-boxed .container-fluid { max-width: 1200px; margin-left: auto; margin-right: auto; }
+.layout-boxed .container-fluid { max-width: 1500px; margin-left: auto; margin-right: auto; }
 .layout-toggle .btn.active { background: rgba(255, 255, 255, 0.9); color: var(--brand-dark); border-color: transparent; }
