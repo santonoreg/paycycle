@@ -159,7 +159,7 @@ function estimateFromPayments(array $payments, array $prices, string $date): flo
  */
 function prepaidInstallments(PDO $pdo, int $subId): int
 {
-    $stmt = $pdo->prepare('SELECT COALESCE(SUM(installments), 0) FROM subscription_prepayments WHERE subscription_id = ?');
+    $stmt = $pdo->prepare('SELECT COALESCE(SUM(installments), 0) FROM subscription_prepayments WHERE subscription_id = ? AND kind = \'installments\'');
     $stmt->execute([$subId]);
     return (int) $stmt->fetchColumn();
 }
@@ -249,12 +249,14 @@ function syncSubscriptionLedger(PDO $pdo, array $sub, array $prices, array $free
  */
 function reconcileInstallmentStatus(PDO $pdo, int $subId): void
 {
-    $count = '((SELECT COUNT(*) FROM subscription_payments WHERE subscription_id = subscriptions.id) + (SELECT COALESCE(SUM(installments), 0) FROM subscription_prepayments WHERE subscription_id = subscriptions.id))';
+    $count = '((SELECT COUNT(*) FROM subscription_payments WHERE subscription_id = subscriptions.id) + (SELECT COALESCE(SUM(installments), 0) FROM subscription_prepayments WHERE subscription_id = subscriptions.id AND kind = \'installments\'))';
     $pdo->prepare("UPDATE subscriptions SET status='paid_off', updated_at=datetime('now')
                    WHERE id = ? AND status IN ('active','trial') AND total_installments IS NOT NULL AND $count >= total_installments")
         ->execute([$subId]);
     $pdo->prepare("UPDATE subscriptions SET status='active', updated_at=datetime('now')
-                   WHERE id = ? AND status = 'paid_off' AND (total_installments IS NULL OR $count < total_installments)")
+                   WHERE id = ? AND status = 'paid_off'
+                     AND ((total_installments IS NULL AND NOT EXISTS (SELECT 1 FROM subscription_prepayments WHERE subscription_id = subscriptions.id AND kind = 'settlement'))
+                          OR (total_installments IS NOT NULL AND $count < total_installments))")
         ->execute([$subId]);
 }
 
@@ -262,9 +264,12 @@ function syncSubscriptionLedgerRows(PDO $pdo, array $sub, array $prices, array $
 {
     $frequency = $sub['frequency'];
 
-    $limitStmt = $pdo->prepare('SELECT total_installments, (SELECT COUNT(*) FROM subscription_payments WHERE subscription_id = subscriptions.id), variable_amount FROM subscriptions WHERE id = ?');
+    $limitStmt = $pdo->prepare('SELECT total_installments, (SELECT COUNT(*) FROM subscription_payments WHERE subscription_id = subscriptions.id), variable_amount, status FROM subscriptions WHERE id = ?');
     $limitStmt->execute([$sub['id']]);
-    [$totalInstallments, $recorded, $variableAmount] = $limitStmt->fetch(PDO::FETCH_NUM) ?: [null, 0, 0];
+    [$totalInstallments, $recorded, $variableAmount, $dbStatus] = $limitStmt->fetch(PDO::FETCH_NUM) ?: [null, 0, 0, null];
+    if ($dbStatus === 'paid_off' && $totalInstallments === null) {
+        return 0; // εξοφλημένη (κλεισμένη) πληρωμή χωρίς πλήθος δόσεων: δεν χρεώνεται άλλο
+    }
     $variableAmount = (int) $variableAmount === 1;
     $confirmedPayments = [];
     if ($variableAmount) {
@@ -412,7 +417,9 @@ function computeSubscriptionStats(array $sub, array $prices, array $freezes, arr
     $prepaidCount = 0;
     $prepaidTotal = 0.0;
     foreach ($prepayments as $pp) {
-        $prepaidCount += (int) $pp['installments'];
+        if (($pp['kind'] ?? 'installments') === 'installments') {
+            $prepaidCount += (int) $pp['installments'];
+        }
         $prepaidTotal += (float) $pp['amount'];
     }
     $installmentsPaid = $scheduledCount + $prepaidCount;
@@ -535,7 +542,7 @@ function getAllSubscriptionsWithDetails(PDO $pdo, ?string $today = null, ?string
     $pricesStmt = $pdo->prepare('SELECT id, cost, effective_from FROM subscription_prices WHERE subscription_id = ? ORDER BY effective_from ASC, id ASC');
     $freezesStmt = $pdo->prepare('SELECT frozen_from, frozen_until FROM subscription_freezes WHERE subscription_id = ? ORDER BY frozen_from ASC');
     $paymentsStmt = $pdo->prepare('SELECT payment_date, amount, is_estimate FROM subscription_payments WHERE subscription_id = ? ORDER BY payment_date ASC');
-    $prepaymentsStmt = $pdo->prepare('SELECT id, paid_on, installments, amount FROM subscription_prepayments WHERE subscription_id = ? ORDER BY paid_on ASC, id ASC');
+    $prepaymentsStmt = $pdo->prepare('SELECT id, paid_on, installments, amount, kind FROM subscription_prepayments WHERE subscription_id = ? ORDER BY paid_on ASC, id ASC');
 
     $result = [];
     foreach ($subs as $sub) {
@@ -704,9 +711,15 @@ function activityText(string $action, array $details): string
         case 'deleted':
             return t('activity.' . $action);
         case 'prepaid':
+            if (!empty($details['settlement'])) {
+                return t('activity.settled', ['amount' => euro((float) ($details['amount'] ?? 0)), 'date' => fdate($details['date'] ?? null)]);
+            }
             return t(!empty($details['full']) ? 'activity.prepaid_full' : 'activity.prepaid', ['n' => (int) ($details['installments'] ?? 0), 'amount' => euro((float) ($details['amount'] ?? 0)), 'date' => fdate($details['date'] ?? null)]);
         case 'prepaid_edited':
         case 'prepaid_removed':
+            if (!empty($details['settlement'])) {
+                return t($action === 'prepaid_edited' ? 'activity.settled_edited' : 'activity.settled_removed', ['amount' => euro((float) ($details['amount'] ?? 0)), 'date' => fdate($details['date'] ?? null)]);
+            }
             return t('activity.' . $action, ['n' => (int) ($details['installments'] ?? 0), 'amount' => euro((float) ($details['amount'] ?? 0)), 'date' => fdate($details['date'] ?? null)]);
         case 'expired':
             return t('activity.expired', ['date' => fdate($details['end_date'] ?? null)]);

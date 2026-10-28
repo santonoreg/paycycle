@@ -394,4 +394,13 @@ return [
     'msg.prepay_removed' => 'Die vorzeitige Zahlung für „{name}“ wurde storniert. Die Raten sind wieder im Plan.',
     'activity.prepaid_edited' => 'Vorzeitige Zahlung korrigiert: {n} Raten ({amount}) am {date}',
     'activity.prepaid_removed' => 'Vorzeitige Zahlung storniert ({n} Raten, {amount} am {date})',
+
+    // Payoff of payments without installments
+    'menu.settle' => 'Zahlung begleichen…',
+    'js.settlement' => 'Zahlung beglichen',
+    'prepay.open_help' => 'Diese Zahlung hat keine feste Anzahl an Raten. Das Begleichen schließt sie ab: Sie wird „Abgeschlossen“ und nicht mehr belastet.',
+    'msg.settled' => '„{name}“ wurde beglichen ({amount}) und ist jetzt abgeschlossen.',
+    'activity.settled' => 'Zahlung beglichen ({amount}) am {date}',
+    'activity.settled_edited' => 'Begleichung korrigiert: {amount} am {date}',
+    'activity.settled_removed' => 'Begleichung storniert ({amount} am {date})',
 ];

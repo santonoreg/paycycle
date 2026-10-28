@@ -167,4 +167,27 @@ check('Full payoff: status completed', $allQ[0]['sub']['status'], 'paid_off');
 check('Full payoff: nothing scheduled after', (int) $pdoQ->query("SELECT COUNT(*) FROM subscription_payments WHERE subscription_id=$subIdQ")->fetchColumn(), 3);
 check('Full payoff: installments paid = total', $allQ[0]['stats']['installments_paid'], 6);
 
+
+// --- Εξόφληση-κλείσιμο επαναλαμβανόμενης πληρωμής χωρίς πλήθος δόσεων ----------
+$pdoS = freshTestDb();
+$subIdS = insertSub($pdoS, ['name' => 'OpenLoan', 'frequency' => 'monthly', 'start_date' => '2026-06-10']);
+$pdoS->exec("UPDATE subscriptions SET kind='recurring' WHERE id=$subIdS");
+insertPrice($pdoS, $subIdS, 80.0, '2026-06-10');
+getAllSubscriptionsWithDetails($pdoS, '2026-08-20'); // Jun, Jul, Aug recorded
+$pdoS->exec("INSERT INTO subscription_prepayments (subscription_id, paid_on, installments, amount, kind) VALUES ($subIdS, '2026-08-20', 1, 500.00, 'settlement')");
+$pdoS->exec("UPDATE subscriptions SET status='paid_off' WHERE id=$subIdS");
+$allS = getAllSubscriptionsWithDetails($pdoS, '2027-03-01');
+check('Settlement: stays completed', $allS[0]['sub']['status'], 'paid_off');
+check('Settlement: not charged any more', (int) $pdoS->query("SELECT COUNT(*) FROM subscription_payments WHERE subscription_id=$subIdS")->fetchColumn(), 3);
+check('Settlement: installments paid excludes the settlement', $allS[0]['stats']['installments_paid'], 3);
+check('Settlement: total paid includes it', $allS[0]['stats']['total_paid'], 740.0);
+check('Settlement: no next payment', $allS[0]['stats']['next_payment_date'], null);
+// reconcile must not bring it back to active
+reconcileInstallmentStatus($pdoS, $subIdS);
+check('Settlement: reconcile keeps completed', $pdoS->query("SELECT status FROM subscriptions WHERE id=$subIdS")->fetchColumn(), 'paid_off');
+// once the settlement is removed it can run again
+$pdoS->exec("DELETE FROM subscription_prepayments WHERE subscription_id=$subIdS");
+reconcileInstallmentStatus($pdoS, $subIdS);
+check('Settlement removed: active again', $pdoS->query("SELECT status FROM subscriptions WHERE id=$subIdS")->fetchColumn(), 'active');
+
 echo "\nΌλα τα tests έτρεξαν.\n";

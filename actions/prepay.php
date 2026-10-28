@@ -29,7 +29,9 @@ $stmt = $pdo->prepare('SELECT * FROM subscriptions WHERE id = ?');
 $stmt->execute([$id]);
 $sub = $stmt->fetch();
 
-if (!$sub || $sub['total_installments'] === null || !in_array($sub['status'], ['active', 'trial', 'frozen'], true)) {
+// Πληρωμή χωρίς πλήθος δόσεων: η εξόφληση τη "κλείνει" (επαναλαμβανόμενες πληρωμές μόνο).
+$isOpen = $sub && $sub['total_installments'] === null;
+if (!$sub || ($isOpen && $sub['kind'] !== 'recurring') || !in_array($sub['status'], ['active', 'trial', 'frozen'], true)) {
     flash('warning', t('err.prepay_unavailable'));
     header('Location: ../' . backPage());
     exit;
@@ -44,6 +46,32 @@ syncSubscriptionLedger($pdo, $sub, $pricesStmt->fetchAll(), $freezesStmt->fetchA
 
 $stmt->execute([$id]);
 $sub = $stmt->fetch();
+if ($isOpen) {
+    $errors = [];
+    if (!is_numeric($amountRaw) || (float) $amountRaw < 0) $errors[] = t('err.invalid_amount');
+    if (!DateTime::createFromFormat('Y-m-d', $paidOn) || $paidOn < $sub['start_date'] || $paidOn > $today) $errors[] = t('err.prepay_date');
+    if ($errors) {
+        flash('danger', implode(' ', $errors));
+        header('Location: ../' . backPage());
+        exit;
+    }
+    $amount = round((float) $amountRaw, 2);
+    $pdo->beginTransaction();
+    try {
+        $pdo->prepare("INSERT INTO subscription_prepayments (subscription_id, paid_on, installments, amount, created_by_name, kind) VALUES (?,?,1,?,?,'settlement')")
+            ->execute([$id, $paidOn, $amount, currentUser()['username']]);
+        $pdo->prepare("UPDATE subscriptions SET status = 'paid_off', updated_at = datetime('now') WHERE id = ?")->execute([$id]);
+        logActivity($pdo, $id, $sub['name'], 'prepaid', ['installments' => 1, 'amount' => $amount, 'date' => $paidOn, 'full' => true, 'settlement' => true]);
+        $pdo->commit();
+        flash('success', t('msg.settled', ['name' => $sub['name'], 'amount' => euro($amount)]));
+    } catch (Throwable $e) {
+        $pdo->rollBack();
+        flash('danger', t('msg.error', ['error' => $e->getMessage()]));
+    }
+    header('Location: ../' . backPage());
+    exit;
+}
+
 $recorded = (int) $pdo->query('SELECT COUNT(*) FROM subscription_payments WHERE subscription_id = ' . $id)->fetchColumn();
 $remaining = (int) $sub['total_installments'] - $recorded - prepaidInstallments($pdo, $id);
 

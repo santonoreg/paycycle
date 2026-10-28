@@ -132,6 +132,17 @@ function getMigrations(): array
                 $pdo->exec('CREATE INDEX IF NOT EXISTS idx_prepayments_sub ON subscription_prepayments(subscription_id, paid_on)');
             },
         ],
+        11 => [
+            'name' => 'subscription_prepayments.kind (installments | settlement)',
+            'up'   => function (PDO $pdo): void {
+                // 'installments' = εξόφληση των τελευταίων δόσεων· 'settlement' = εξόφληση-κλείσιμο
+                // επαναλαμβανόμενης πληρωμής χωρίς πλήθος δόσεων. Οι υπάρχουσες γραμμές μένουν 'installments'.
+                $cols = array_column($pdo->query('PRAGMA table_info(subscription_prepayments)')->fetchAll(), 'name');
+                if (!in_array('kind', $cols, true)) {
+                    $pdo->exec("ALTER TABLE subscription_prepayments ADD COLUMN kind TEXT NOT NULL DEFAULT 'installments' CHECK(kind IN ('installments','settlement'))");
+                }
+            },
+        ],
         4 => [
             'name' => 'subscriptions.total_installments + status paid_off (table rebuild, data preserved)',
             'own_transaction' => true,

@@ -17,7 +17,7 @@ $pdo = getDb();
 $today = date('Y-m-d');
 $prepId = (int) ($_POST['id'] ?? 0);
 
-$stmt = $pdo->prepare('SELECT p.*, s.name AS sub_name, s.status AS sub_status, s.total_installments, s.start_date, s.kind FROM subscription_prepayments p JOIN subscriptions s ON s.id = p.subscription_id WHERE p.id = ?');
+$stmt = $pdo->prepare('SELECT p.*, s.name AS sub_name, s.status AS sub_status, s.total_installments, s.start_date, s.kind AS sub_kind FROM subscription_prepayments p JOIN subscriptions s ON s.id = p.subscription_id WHERE p.id = ?');
 $stmt->execute([$prepId]);
 $prep = $stmt->fetch();
 if (!$prep) {
@@ -26,12 +26,22 @@ if (!$prep) {
     exit;
 }
 $subId = (int) $prep['subscription_id'];
-setKind($prep['kind']);
+setKind($prep["sub_kind"]);
 
 /** Μετά από αλλαγή εξόφλησης: ενημέρωσε την κατάσταση και συμπλήρωσε τις δόσεις που έχουν ήδη λήξει. */
-function settleAfterPrepaymentChange(PDO $pdo, int $subId, string $today): void
+function settleAfterPrepaymentChange(PDO $pdo, int $subId, string $today, ?string $settledOn = null): void
 {
     $row = $pdo->query('SELECT * FROM subscriptions WHERE id = ' . $subId)->fetch();
+    if ($row['total_installments'] === null) {
+        // Ακυρώθηκε η εξόφληση-κλείσιμο: η πληρωμή τρέχει ξανά· το διάστημα που ήταν εξοφλημένη δεν χρεώνεται.
+        if ($row['status'] === 'paid_off') {
+            if ($settledOn !== null && $settledOn < $today) {
+                $pdo->prepare('INSERT INTO subscription_freezes (subscription_id, frozen_from, frozen_until) VALUES (?,?,?)')->execute([$subId, $settledOn, $today]);
+            }
+            $pdo->prepare("UPDATE subscriptions SET status = 'active', updated_at = datetime('now') WHERE id = ?")->execute([$subId]);
+        }
+        return;
+    }
     $recorded = (int) $pdo->query('SELECT COUNT(*) FROM subscription_payments WHERE subscription_id = ' . $subId)->fetchColumn();
     $remaining = (int) $row['total_installments'] - $recorded - prepaidInstallments($pdo, $subId);
     if ($remaining <= 0 && in_array($row['status'], ['active', 'trial', 'frozen'], true)) {
@@ -54,8 +64,9 @@ $pdo->beginTransaction();
 try {
     $pdo->prepare('DELETE FROM subscription_prepayments WHERE id = ?')->execute([$prepId]);
     $pdo->prepare("UPDATE subscriptions SET updated_at = datetime('now') WHERE id = ?")->execute([$subId]);
-    settleAfterPrepaymentChange($pdo, $subId, $today);
-    logActivity($pdo, $subId, $prep['sub_name'], 'prepaid_removed', ['installments' => (int) $prep['installments'], 'amount' => (float) $prep['amount'], 'date' => $prep['paid_on']]);
+    $isSettlement = ($prep['kind'] ?? 'installments') === 'settlement';
+    settleAfterPrepaymentChange($pdo, $subId, $today, $prep['paid_on']);
+    logActivity($pdo, $subId, $prep['sub_name'], 'prepaid_removed', ['installments' => (int) $prep['installments'], 'amount' => (float) $prep['amount'], 'date' => $prep['paid_on']] + ($isSettlement ? ['settlement' => true] : []));
     $pdo->commit();
     flash('success', t('msg.prepay_removed', ['name' => $prep['sub_name']]));
 } catch (Throwable $e) {

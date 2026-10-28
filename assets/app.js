@@ -171,11 +171,19 @@ document.addEventListener('DOMContentLoaded', function () {
         document.getElementById('prepay-name').textContent = d.name;
         document.getElementById('prepay-remaining').textContent = tpl(I18N.js.prepay_remaining, { n: prepay.remaining });
         document.getElementById('prepay-full-label').textContent = tpl(I18N.js.prepay_full, { n: prepay.remaining });
+        var isOpen = d.open === '1';
+        document.getElementById('prepay-modes').classList.toggle('d-none', isOpen);
         modeFull.checked = true;
         countInput.value = 1;
         countInput.max = prepay.remaining;
         // Αν απομένει μία δόση, η "συγκεκριμένο πλήθος" δεν έχει νόημα
         modeCount.disabled = prepay.remaining < 2;
+        if (isOpen) {
+          // Πληρωμή χωρίς πλήθος δόσεων: η εξόφληση την κλείνει· το ποσό το δίνει ο χρήστης
+          document.getElementById('prepay-remaining').textContent = I18N.js.prepay_open_help;
+          prepay.dirty = true;
+          amountInput.value = '';
+        }
         prepayRecalc();
         bootstrap.Modal.getOrCreateInstance(prepayModalEl).show();
       });
@@ -298,7 +306,7 @@ document.addEventListener('DOMContentLoaded', function () {
       var paymentsTotalEl = document.getElementById('payments-total');
       if (paymentsTotalEl) {
         var total = payments.reduce(function (sum, p) { return sum + Number(p.amount); }, 0);
-        var installmentCount = payments.reduce(function (n, p) { return n + (p.prepaid ? Number(p.prepaid) : 1); }, 0);
+        var installmentCount = payments.reduce(function (n, p) { return n + (p.settlement ? 0 : (p.prepaid ? Number(p.prepaid) : 1)); }, 0);
         paymentsTotalEl.textContent = tpl(I18N.js.installments_total, { n: installmentCount, total: fmtEuro(total) });
       }
       var sortedPayments = payments.slice().sort(function (a, b) { return b.payment_date.localeCompare(a.payment_date); });
@@ -318,8 +326,8 @@ document.addEventListener('DOMContentLoaded', function () {
                 '<input type="hidden" name="csrf_token" value="' + escapeHtml(payCsrf.value) + '">' +
                 (payBack ? '<input type="hidden" name="back" value="' + escapeHtml(payBack.value) + '">' : '') +
                 '<input type="hidden" name="id" value="' + escapeHtml(p.prepay_id) + '">' +
-                '<span class="awaiting-badge"><i class="bi bi-cash-coin"></i> ' + escapeHtml(I18N.js.prepay_label) + '</span>' +
-                '<input type="number" min="1" max="' + escapeHtml(p.prepay_max) + '" step="1" name="installments" value="' + escapeHtml(p.prepaid) + '" required class="form-control form-control-sm num" style="width:70px" title="' + escapeHtml(I18N.js.prepay_count) + '">' +
+                '<span class="awaiting-badge"><i class="bi bi-cash-coin"></i> ' + escapeHtml(p.settlement ? I18N.js.settlement : I18N.js.prepay_label) + '</span>' +
+                (p.settlement ? '' : '<input type="number" min="1" max="' + escapeHtml(p.prepay_max) + '" step="1" name="installments" value="' + escapeHtml(p.prepaid) + '" required class="form-control form-control-sm num" style="width:70px" title="' + escapeHtml(I18N.js.prepay_count) + '">') +
                 '<input type="number" step="0.01" min="0" name="amount" value="' + Number(p.amount).toFixed(2) + '" required class="form-control form-control-sm num" style="width:100px">' +
                 '<input type="date" name="paid_on" value="' + escapeHtml(p.payment_date) + '" min="' + escapeHtml(p.prepay_min_date) + '" required class="form-control form-control-sm" style="width:140px">' +
                 '<span class="ms-auto d-flex gap-1">' +
@@ -330,7 +338,7 @@ document.addEventListener('DOMContentLoaded', function () {
             if (p.prepaid) {
               return '<div class="entry"><strong class="num">' + fmtEuro(p.amount) + '</strong> ' +
                 '<span class="text-muted">' + fmtDate(p.payment_date) + '</span> ' +
-                '<span class="awaiting-badge"><i class="bi bi-cash-coin"></i> ' + escapeHtml(tpl(I18N.js.prepayment, { n: p.prepaid })) + '</span></div>';
+                '<span class="awaiting-badge"><i class="bi bi-cash-coin"></i> ' + escapeHtml(p.settlement ? I18N.js.settlement : tpl(I18N.js.prepayment, { n: p.prepaid })) + '</span></div>';
             }
             var badge = p.is_estimate ? ' <span class="awaiting-badge"><i class="bi bi-hourglass-split"></i> ' + escapeHtml(I18N.js.awaiting_bill) + '</span>' : '';
             if (canEditAmounts) {

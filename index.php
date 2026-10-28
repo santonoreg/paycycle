@@ -306,7 +306,7 @@ if ($expiring): ?>
         ], $d['payments']), array_map(fn($pp) => [
             // εξόφληση: μία γραμμή για όλες τις δόσεις που εξοφλήθηκαν νωρίτερα
             'amount' => (float) $pp['amount'], 'payment_date' => $pp['paid_on'], 'is_estimate' => 0, 'prepaid' => (int) $pp['installments'],
-            'prepay_id' => (int) $pp['id'], 'prepay_max' => (int) ($d['stats']['installments_remaining'] ?? 0) + (int) $pp['installments'], 'prepay_min_date' => $sub['start_date'],
+            'settlement' => ($pp['kind'] ?? '') === 'settlement', 'prepay_id' => (int) $pp['id'], 'prepay_max' => (int) ($d['stats']['installments_remaining'] ?? 0) + (int) $pp['installments'], 'prepay_min_date' => $sub['start_date'],
         ], $d['prepayments']))), ENT_QUOTES);
       ?>
         <tr class="<?= $rowClass ?><?= $fGroup !== '' ? ' group-child d-none' : '' ?>"<?= $fGroup !== '' ? ' data-group="g' . $gIndex . '"' : '' ?>>
@@ -384,6 +384,9 @@ if ($expiring): ?>
                   data-id="<?= $sub['id'] ?>" data-name="<?= htmlspecialchars($sub['name']) ?>"
                   data-remaining="<?= (int) $stats['installments_remaining'] ?>"
                   data-unit="<?= number_format((float) ($stats['next_payment_amount'] ?? $stats['current_price']), 2, '.', '') ?>"><i class="bi bi-cash-coin me-2"></i><?= te('menu.prepay') ?></button></li>
+                <?php elseif ($stats['installments_total'] === null && $sub['kind'] === 'recurring' && in_array($sub['status'], ['active', 'trial', 'frozen'], true)): ?>
+                <li><button type="button" class="dropdown-item js-prepay" data-open="1"
+                  data-id="<?= $sub['id'] ?>" data-name="<?= htmlspecialchars($sub['name']) ?>" data-remaining="1" data-unit="0"><i class="bi bi-cash-coin me-2"></i><?= te('menu.settle') ?></button></li>
                 <?php endif; ?>
                 <li><hr class="dropdown-divider"></li>
                   <?php if (in_array($sub['status'], ['active', 'trial'], true)): ?>
@@ -544,6 +547,7 @@ if ($expiring): ?>
         </div>
         <div class="modal-body">
           <p class="mb-3" id="prepay-remaining"></p>
+          <div id="prepay-modes">
           <div class="form-check mb-2">
             <input class="form-check-input" type="radio" name="mode" id="prepay-mode-full" value="full" checked>
             <label class="form-check-label" for="prepay-mode-full" id="prepay-full-label"></label>
@@ -554,6 +558,7 @@ if ($expiring): ?>
           </div>
           <div class="mb-3 ms-4" style="max-width: 10rem;">
             <input type="number" min="1" step="1" name="installments" id="prepay-count" class="form-control form-control-sm" value="1" disabled aria-label="<?= te('prepay.count') ?>">
+          </div>
           </div>
           <div class="row">
             <div class="col-6 mb-3">
