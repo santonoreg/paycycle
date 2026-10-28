@@ -541,7 +541,7 @@ function getAllSubscriptionsWithDetails(PDO $pdo, ?string $today = null, ?string
 
     $pricesStmt = $pdo->prepare('SELECT id, cost, effective_from FROM subscription_prices WHERE subscription_id = ? ORDER BY effective_from ASC, id ASC');
     $freezesStmt = $pdo->prepare('SELECT frozen_from, frozen_until FROM subscription_freezes WHERE subscription_id = ? ORDER BY frozen_from ASC');
-    $paymentsStmt = $pdo->prepare('SELECT payment_date, amount, is_estimate FROM subscription_payments WHERE subscription_id = ? ORDER BY payment_date ASC');
+    $paymentsStmt = $pdo->prepare('SELECT id, payment_date, amount, is_estimate, paid_on FROM subscription_payments WHERE subscription_id = ? ORDER BY payment_date ASC');
     $prepaymentsStmt = $pdo->prepare('SELECT id, paid_on, installments, amount, kind FROM subscription_prepayments WHERE subscription_id = ? ORDER BY paid_on ASC, id ASC');
 
     $result = [];
@@ -673,7 +673,7 @@ function getDistinctPaymentMethods(PDO $pdo): array
  * Καταγράφει ποιος έκανε τι σε μια συνδρομή. Δεν πετά ποτέ exception: αν η
  * καταγραφή αποτύχει, η ίδια η ενέργεια δεν πρέπει να χαλάσει.
  *
- * @param string $action created|edited|price_added|price_deleted|payment_confirmed|frozen|unfrozen|canceled|reactivated|expired|prepaid|prepaid_edited|prepaid_removed|deleted
+ * @param string $action created|edited|price_added|price_deleted|payment_confirmed|frozen|unfrozen|canceled|reactivated|expired|prepaid|prepaid_edited|prepaid_removed|paid_early|paid_early_edited|paid_early_removed|deleted
  */
 function logActivity(PDO $pdo, int $subId, string $subName, string $action, array $details = [], bool $system = false): void
 {
@@ -721,6 +721,10 @@ function activityText(string $action, array $details): string
                 return t($action === 'prepaid_edited' ? 'activity.settled_edited' : 'activity.settled_removed', ['amount' => euro((float) ($details['amount'] ?? 0)), 'date' => fdate($details['date'] ?? null)]);
             }
             return t('activity.' . $action, ['n' => (int) ($details['installments'] ?? 0), 'amount' => euro((float) ($details['amount'] ?? 0)), 'date' => fdate($details['date'] ?? null)]);
+        case 'paid_early':
+        case 'paid_early_edited':
+        case 'paid_early_removed':
+            return t('activity.' . $action, ['slot' => fdate($details['slot'] ?? null), 'amount' => euro((float) ($details['amount'] ?? 0)), 'date' => fdate($details['paid_on'] ?? null)]);
         case 'expired':
             return t('activity.expired', ['date' => fdate($details['end_date'] ?? null)]);
     }

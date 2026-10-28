@@ -190,6 +190,21 @@ document.addEventListener('DOMContentLoaded', function () {
     });
   }
 
+  // --- Πληρωμή της επόμενης δόσης νωρίτερα ---
+  var earlyModalEl = document.getElementById('earlyModal');
+  if (earlyModalEl) {
+    document.querySelectorAll('.js-early').forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        var d = btn.dataset;
+        document.getElementById('early-id').value = d.id;
+        document.getElementById('early-name').textContent = d.name;
+        document.getElementById('early-intro').textContent = tpl(I18N.js.early_intro, { date: d.slot });
+        document.getElementById('early-amount').value = d.amount;
+        bootstrap.Modal.getOrCreateInstance(earlyModalEl).show();
+      });
+    });
+  }
+
   // --- Μηνύματα (toast): εμφανίζονται και εξαφανίζονται μόνα τους ---
   document.querySelectorAll('.toast-container .toast').forEach(function (el) {
     bootstrap.Toast.getOrCreateInstance(el).show();
@@ -320,6 +335,21 @@ document.addEventListener('DOMContentLoaded', function () {
           // Μεταβλητό ποσό + συνδεδεμένος διαχειριστής: κάθε γραμμή έχει πεδίο για το πραγματικό ποσό του λογαριασμού
           var canEditAmounts = !!payCsrf && d.variable === '1';
           paymentsList.innerHTML = sortedPayments.map(function (p) {
+            if (p.early_open && payCsrf) {
+              // Δόση που πληρώθηκε νωρίτερα (η ημερομηνία της δεν έχει φτάσει): διορθώνεται ή ακυρώνεται
+              return '<div class="entry"><form method="post" action="actions/edit_early_payment.php" class="d-flex align-items-center gap-2 flex-wrap">' +
+                '<input type="hidden" name="csrf_token" value="' + escapeHtml(payCsrf.value) + '">' +
+                (payBack ? '<input type="hidden" name="back" value="' + escapeHtml(payBack.value) + '">' : '') +
+                '<input type="hidden" name="id" value="' + escapeHtml(p.pay_id) + '">' +
+                '<span class="text-muted">' + fmtDate(p.payment_date) + '</span>' +
+                '<span class="awaiting-badge"><i class="bi bi-calendar-check"></i> ' + escapeHtml(I18N.js.early_label) + '</span>' +
+                '<input type="number" step="0.01" min="0" name="amount" value="' + Number(p.amount).toFixed(2) + '" required class="form-control form-control-sm num" style="width:100px">' +
+                '<input type="date" name="paid_on" value="' + escapeHtml(p.paid_on) + '" min="' + escapeHtml(p.min_date) + '" required class="form-control form-control-sm" style="width:140px" title="' + escapeHtml(I18N.js.early_paid_on) + '">' +
+                '<span class="ms-auto d-flex gap-1">' +
+                '<button type="submit" class="btn btn-sm btn-outline-primary py-0 px-2" title="' + escapeHtml(I18N.js.prepay_save) + '"><i class="bi bi-check-lg"></i></button>' +
+                '<button type="submit" formaction="actions/delete_early_payment.php" formnovalidate class="btn btn-sm btn-outline-danger py-0 px-2" title="' + escapeHtml(I18N.js.early_cancel) + '" onclick="return confirm(' + escapeHtml(JSON.stringify(I18N.js.early_cancel_confirm)) + ');"><i class="bi bi-trash"></i></button></span>' +
+                '</form></div>';
+            }
             if (p.prepaid && payCsrf) {
               // Εξόφληση: διορθώνεται (πλήθος, ποσό, ημερομηνία) ή ακυρώνεται
               return '<div class="entry"><form method="post" action="actions/edit_prepayment.php" class="d-flex align-items-center gap-2 flex-wrap">' +
@@ -340,7 +370,9 @@ document.addEventListener('DOMContentLoaded', function () {
                 '<span class="text-muted">' + fmtDate(p.payment_date) + '</span> ' +
                 '<span class="awaiting-badge"><i class="bi bi-cash-coin"></i> ' + escapeHtml(p.settlement ? I18N.js.settlement : tpl(I18N.js.prepayment, { n: p.prepaid })) + '</span></div>';
             }
+            var earlyBadge = p.paid_on ? ' <span class="awaiting-badge"><i class="bi bi-calendar-check"></i> ' + escapeHtml(tpl(I18N.js.early_on, { date: fmtDate(p.paid_on) })) + '</span>' : '';
             var badge = p.is_estimate ? ' <span class="awaiting-badge"><i class="bi bi-hourglass-split"></i> ' + escapeHtml(I18N.js.awaiting_bill) + '</span>' : '';
+            badge += earlyBadge;
             if (canEditAmounts) {
               return '<div class="entry"><form method="post" action="actions/confirm_payment.php" class="d-flex align-items-center gap-2 flex-wrap">' +
                 '<input type="hidden" name="csrf_token" value="' + escapeHtml(payCsrf.value) + '">' +

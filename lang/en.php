@@ -414,4 +414,23 @@ return [
     'activity.settled' => 'Paid off the payment ({amount}) on {date}',
     'activity.settled_edited' => 'Corrected the payoff: {amount} on {date}',
     'activity.settled_removed' => 'Canceled the payoff ({amount} on {date})',
+
+    // Paying the next installment early
+    'menu.pay_early' => 'Pay the next installment early…',
+    'early.title' => 'Pay early',
+    'early.submit' => 'Paid',
+    'early.help' => 'This does not pay the payment off: the next installment counts as paid, but the payment carries on as usual and the following installments keep their regular dates.',
+    'js.early_intro' => 'You are paying early the installment due on {date}. It will show as paid.',
+    'js.early_label' => 'Paid early',
+    'js.early_on' => 'Paid early ({date})',
+    'js.early_paid_on' => 'Date actually paid',
+    'js.early_cancel' => 'Cancel this payment',
+    'js.early_cancel_confirm' => 'Cancel this payment? The installment goes back to unpaid on its regular date.',
+    'msg.paid_early' => 'The installment of "{name}" due {date} was paid early ({amount}). The payment carries on as usual.',
+    'msg.early_updated' => 'The payment of "{name}" was corrected.',
+    'msg.early_removed' => 'The payment of the {date} installment of "{name}" was canceled.',
+    'err.early_unavailable' => 'There is no next installment to pay early (or the entry is not active).',
+    'activity.paid_early' => 'Paid the {slot} installment early ({amount}) on {date}',
+    'activity.paid_early_edited' => 'Corrected the payment of the {slot} installment: {amount} on {date}',
+    'activity.paid_early_removed' => 'Canceled the early payment of the {slot} installment ({amount})',
 ];

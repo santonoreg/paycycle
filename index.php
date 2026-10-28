@@ -303,6 +303,8 @@ if ($expiring): ?>
         $activityJson = htmlspecialchars(json_encode($activityBySub[(int) $sub['id']] ?? [], JSON_UNESCAPED_UNICODE), ENT_QUOTES);
         $paymentsJson = htmlspecialchars(json_encode(array_merge(array_map(fn($p) => [
             'amount' => (float) $p['amount'], 'payment_date' => $p['payment_date'], 'is_estimate' => (int) $p['is_estimate'],
+            // πληρώθηκε νωρίτερα: διορθώνεται/ακυρώνεται όσο η ημερομηνία της δόσης δεν έχει φτάσει
+            'pay_id' => (int) $p['id'], 'paid_on' => $p['paid_on'] ?? null, 'early_open' => !empty($p['paid_on']) && $p['payment_date'] > $today, 'min_date' => $sub['start_date'],
         ], $d['payments']), array_map(fn($pp) => [
             // εξόφληση: μία γραμμή για όλες τις δόσεις που εξοφλήθηκαν νωρίτερα
             'amount' => (float) $pp['amount'], 'payment_date' => $pp['paid_on'], 'is_estimate' => 0, 'prepaid' => (int) $pp['installments'],
@@ -387,6 +389,12 @@ if ($expiring): ?>
                 <?php elseif ($stats['installments_total'] === null && $sub['kind'] === 'recurring' && in_array($sub['status'], ['active', 'trial', 'frozen'], true)): ?>
                 <li><button type="button" class="dropdown-item js-prepay" data-open="1"
                   data-id="<?= $sub['id'] ?>" data-name="<?= htmlspecialchars($sub['name']) ?>" data-remaining="1" data-unit="0"><i class="bi bi-cash-coin me-2"></i><?= te('menu.settle') ?></button></li>
+                <?php endif; ?>
+                <?php if (in_array($sub['status'], ['active', 'trial'], true) && $stats['next_payment_date']): ?>
+                <li><button type="button" class="dropdown-item js-early"
+                  data-id="<?= $sub['id'] ?>" data-name="<?= htmlspecialchars($sub['name']) ?>"
+                  data-slot="<?= fdate($stats['next_payment_date']) ?>"
+                  data-amount="<?= number_format((float) ($stats['next_payment_amount'] ?? $stats['current_price']), 2, '.', '') ?>"><i class="bi bi-calendar-check me-2"></i><?= te('menu.pay_early') ?></button></li>
                 <?php endif; ?>
                 <li><hr class="dropdown-divider"></li>
                   <?php if (in_array($sub['status'], ['active', 'trial'], true)): ?>
@@ -576,6 +584,42 @@ if ($expiring): ?>
         <div class="modal-footer">
           <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal"><?= te('common.cancel') ?></button>
           <button type="submit" class="btn btn-primary"><?= te('prepay.submit') ?></button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+<?php endif; ?>
+
+<?php if ($loggedIn): ?>
+<!-- ===================== Modal: Πληρωμή επόμενης δόσης νωρίτερα ===================== -->
+<div class="modal fade" id="earlyModal" tabindex="-1">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <form method="post" action="actions/pay_early.php" id="earlyForm">
+        <?= csrfField() ?>
+        <input type="hidden" name="id" id="early-id">
+        <div class="modal-header">
+          <h5 class="modal-title"><i class="bi bi-calendar-check"></i> <?= te('early.title') ?> — <span id="early-name"></span></h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+        </div>
+        <div class="modal-body">
+          <p class="mb-3" id="early-intro"></p>
+          <div class="row">
+            <div class="col-6 mb-3">
+              <label class="form-label" for="early-amount"><?= te('prepay.amount') ?></label>
+              <input type="number" step="0.01" min="0" name="amount" id="early-amount" class="form-control" required>
+            </div>
+            <div class="col-6 mb-3">
+              <label class="form-label" for="early-date"><?= te('prepay.date') ?></label>
+              <input type="date" name="paid_on" id="early-date" class="form-control" value="<?= $today ?>" max="<?= $today ?>" required>
+            </div>
+          </div>
+          <div class="alert alert-info py-2 small mb-0"><i class="bi bi-info-circle"></i> <?= te('early.help') ?></div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal"><?= te('common.cancel') ?></button>
+          <button type="submit" class="btn btn-primary"><?= te('early.submit') ?></button>
         </div>
       </form>
     </div>

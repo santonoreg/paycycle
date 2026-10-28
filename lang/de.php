@@ -403,4 +403,23 @@ return [
     'activity.settled' => 'Zahlung beglichen ({amount}) am {date}',
     'activity.settled_edited' => 'Begleichung korrigiert: {amount} am {date}',
     'activity.settled_removed' => 'Begleichung storniert ({amount} am {date})',
+
+    // Paying the next installment early
+    'menu.pay_early' => 'Nächste Rate früher zahlen…',
+    'early.title' => 'Früher zahlen',
+    'early.submit' => 'Bezahlt',
+    'early.help' => 'Das ist keine Begleichung: Die nächste Rate gilt als bezahlt, die Zahlung läuft aber normal weiter und die folgenden Raten behalten ihre regulären Termine.',
+    'js.early_intro' => 'Du zahlst die am {date} fällige Rate früher. Sie wird als bezahlt angezeigt.',
+    'js.early_label' => 'Früher bezahlt',
+    'js.early_on' => 'Früher bezahlt ({date})',
+    'js.early_paid_on' => 'Tatsächliches Zahlungsdatum',
+    'js.early_cancel' => 'Zahlung stornieren',
+    'js.early_cancel_confirm' => 'Diese Zahlung stornieren? Die Rate gilt zum regulären Termin wieder als unbezahlt.',
+    'msg.paid_early' => 'Die am {date} fällige Rate von „{name}“ wurde früher bezahlt ({amount}). Die Zahlung läuft normal weiter.',
+    'msg.early_updated' => 'Die Zahlung von „{name}“ wurde korrigiert.',
+    'msg.early_removed' => 'Die Zahlung der Rate vom {date} von „{name}“ wurde storniert.',
+    'err.early_unavailable' => 'Es gibt keine nächste Rate zum früheren Bezahlen (oder der Eintrag ist nicht aktiv).',
+    'activity.paid_early' => 'Rate vom {slot} früher bezahlt ({amount}) am {date}',
+    'activity.paid_early_edited' => 'Zahlung der Rate vom {slot} korrigiert: {amount} am {date}',
+    'activity.paid_early_removed' => 'Frühere Zahlung der Rate vom {slot} storniert ({amount})',
 ];

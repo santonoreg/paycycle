@@ -143,6 +143,16 @@ function getMigrations(): array
                 }
             },
         ],
+        12 => [
+            'name' => 'subscription_payments.paid_on (date an upcoming installment was actually paid early)',
+            'up'   => function (PDO $pdo): void {
+                // NULL = κανονική πληρωμή. Αν υπάρχει, η δόση (payment_date) πληρώθηκε νωρίτερα, στη paid_on.
+                $cols = array_column($pdo->query('PRAGMA table_info(subscription_payments)')->fetchAll(), 'name');
+                if (!in_array('paid_on', $cols, true)) {
+                    $pdo->exec('ALTER TABLE subscription_payments ADD COLUMN paid_on TEXT');
+                }
+            },
+        ],
         4 => [
             'name' => 'subscriptions.total_installments + status paid_off (table rebuild, data preserved)',
             'own_transaction' => true,

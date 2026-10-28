@@ -2,6 +2,7 @@
 require __DIR__ . '/config.php';
 require __DIR__ . '/includes/db.php';
 require __DIR__ . '/includes/functions.php';
+require __DIR__ . '/includes/stats_helpers.php';
 
 function check(string $label, $actual, $expected): void
 {
@@ -189,5 +190,30 @@ check('Settlement: reconcile keeps completed', $pdoS->query("SELECT status FROM 
 $pdoS->exec("DELETE FROM subscription_prepayments WHERE subscription_id=$subIdS");
 reconcileInstallmentStatus($pdoS, $subIdS);
 check('Settlement removed: active again', $pdoS->query("SELECT status FROM subscriptions WHERE id=$subIdS")->fetchColumn(), 'active');
+
+
+// --- Πληρωμή της επόμενης δόσης νωρίτερα (ασφάλεια κάθε 6 μήνες) -------------------
+$pdoE = freshTestDb();
+$subIdE = insertSub($pdoE, ['name' => 'Insurance', 'frequency' => 'half-yearly', 'start_date' => '2026-03-15']);
+$pdoE->exec("UPDATE subscriptions SET kind='recurring' WHERE id=$subIdE");
+insertPrice($pdoE, $subIdE, 300.0, '2026-03-15');
+$allE = getAllSubscriptionsWithDetails($pdoE, '2026-08-20');
+check('Early: before - paid', $allE[0]['stats']['installments_paid'], 1);            // 15/03
+check('Early: before - next', $allE[0]['stats']['next_payment_date'], '2026-09-15');
+// pay the 15/09 installment early, on 2026-08-20
+$pdoE->exec("INSERT INTO subscription_payments (subscription_id, payment_date, amount, is_estimate, paid_on) VALUES ($subIdE, '2026-09-15', 300.00, 0, '2026-08-20')");
+$allE = getAllSubscriptionsWithDetails($pdoE, '2026-08-20');
+check('Early: counts as paid', $allE[0]['stats']['installments_paid'], 2);
+check('Early: next payment is the following half-year', $allE[0]['stats']['next_payment_date'], '2027-03-15');
+check('Early: still active (not a payoff)', $allE[0]['sub']['status'], 'active');
+// time passes: nothing is charged twice, the schedule continues
+$allE = getAllSubscriptionsWithDetails($pdoE, '2027-03-20');
+check('Early: later - installments recorded', $allE[0]['stats']['installments_paid'], 3);
+check('Early: later - no duplicate for the paid slot', (int) $pdoE->query("SELECT COUNT(*) FROM subscription_payments WHERE subscription_id=$subIdE AND payment_date='2026-09-15'")->fetchColumn(), 1);
+check('Early: later - next payment', $allE[0]['stats']['next_payment_date'], '2027-09-15');
+// spend statistics count it in the month it was really paid (August), not the slot month
+$m = computeMonthlySpendHistory($pdoE, 6, '2026-10-01', 'recurring');
+check('Early: spend counted in the paid month', $m['2026-08'] ?? null, 300.0);
+check('Early: spend not counted in the slot month', $m['2026-09'] ?? null, 0.0);
 
 echo "\nΌλα τα tests έτρεξαν.\n";
