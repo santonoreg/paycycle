@@ -386,9 +386,6 @@ if ($expiring): ?>
                   data-id="<?= $sub['id'] ?>" data-name="<?= htmlspecialchars($sub['name']) ?>"
                   data-remaining="<?= (int) $stats['installments_remaining'] ?>"
                   data-unit="<?= number_format((float) ($stats['next_payment_amount'] ?? $stats['current_price']), 2, '.', '') ?>"><i class="bi bi-cash-coin me-2"></i><?= te('menu.prepay') ?></button></li>
-                <?php elseif ($stats['installments_total'] === null && $sub['kind'] === 'recurring' && in_array($sub['status'], ['active', 'trial', 'frozen'], true)): ?>
-                <li><button type="button" class="dropdown-item js-prepay" data-open="1"
-                  data-id="<?= $sub['id'] ?>" data-name="<?= htmlspecialchars($sub['name']) ?>" data-remaining="1" data-unit="0"><i class="bi bi-cash-coin me-2"></i><?= te('menu.settle') ?></button></li>
                 <?php endif; ?>
                 <?php if (in_array($sub['status'], ['active', 'trial'], true) && $stats['next_payment_date']): ?>
                 <li><button type="button" class="dropdown-item js-early"

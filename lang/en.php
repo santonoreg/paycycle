@@ -407,10 +407,7 @@ return [
     'activity.prepaid_removed' => 'Canceled the payoff ({n} installments, {amount} on {date})',
 
     // Payoff of payments without installments
-    'menu.settle' => 'Pay off the payment…',
     'js.settlement' => 'Payment paid off',
-    'prepay.open_help' => 'This payment has no fixed number of installments. Paying it off closes it: it becomes "Completed" and is no longer charged.',
-    'msg.settled' => '"{name}" was paid off ({amount}) and is now completed.',
     'activity.settled' => 'Paid off the payment ({amount}) on {date}',
     'activity.settled_edited' => 'Corrected the payoff: {amount} on {date}',
     'activity.settled_removed' => 'Canceled the payoff ({amount} on {date})',

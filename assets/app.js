@@ -171,19 +171,11 @@ document.addEventListener('DOMContentLoaded', function () {
         document.getElementById('prepay-name').textContent = d.name;
         document.getElementById('prepay-remaining').textContent = tpl(I18N.js.prepay_remaining, { n: prepay.remaining });
         document.getElementById('prepay-full-label').textContent = tpl(I18N.js.prepay_full, { n: prepay.remaining });
-        var isOpen = d.open === '1';
-        document.getElementById('prepay-modes').classList.toggle('d-none', isOpen);
         modeFull.checked = true;
         countInput.value = 1;
         countInput.max = prepay.remaining;
         // Αν απομένει μία δόση, η "συγκεκριμένο πλήθος" δεν έχει νόημα
         modeCount.disabled = prepay.remaining < 2;
-        if (isOpen) {
-          // Πληρωμή χωρίς πλήθος δόσεων: η εξόφληση την κλείνει· το ποσό το δίνει ο χρήστης
-          document.getElementById('prepay-remaining').textContent = I18N.js.prepay_open_help;
-          prepay.dirty = true;
-          amountInput.value = '';
-        }
         prepayRecalc();
         bootstrap.Modal.getOrCreateInstance(prepayModalEl).show();
       });

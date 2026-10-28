@@ -407,10 +407,7 @@ return [
     'activity.prepaid_removed' => 'Ακύρωση εξόφλησης ({n} δόσεις, {amount} στις {date})',
 
     // Payoff of payments without installments
-    'menu.settle' => 'Εξόφληση πληρωμής…',
     'js.settlement' => 'Εξόφληση πληρωμής',
-    'prepay.open_help' => 'Η πληρωμή δεν έχει συγκεκριμένο πλήθος δόσεων. Η εξόφληση την κλείνει: γίνεται «Ολοκληρωμένη» και δεν χρεώνεται άλλο.',
-    'msg.settled' => 'Η «{name}» εξοφλήθηκε ({amount}) και έγινε ολοκληρωμένη.',
     'activity.settled' => 'Εξόφληση πληρωμής ({amount}) στις {date}',
     'activity.settled_edited' => 'Διόρθωση εξόφλησης πληρωμής: {amount} στις {date}',
     'activity.settled_removed' => 'Ακύρωση εξόφλησης πληρωμής ({amount} στις {date})',
