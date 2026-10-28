@@ -34,7 +34,7 @@ function computeMonthlySpendHistory(PDO $pdo, int $monthsBack = 12, ?string $tod
     }
 
     $sql = "SELECT substr(p.payment_date,1,7) AS ym, SUM(p.amount) AS total
-            FROM subscription_payments p JOIN subscriptions s ON s.id = p.subscription_id
+            FROM (SELECT subscription_id, payment_date, amount FROM subscription_payments UNION ALL SELECT subscription_id, paid_on, amount FROM subscription_prepayments) p JOIN subscriptions s ON s.id = p.subscription_id
             WHERE p.payment_date >= ?" . ($kind !== null ? ' AND s.kind = ?' : '') . ' GROUP BY ym';
     $stmt = $pdo->prepare($sql);
     $stmt->execute($kind !== null ? [$start->format('Y-m-d'), $kind] : [$start->format('Y-m-d')]);
@@ -58,7 +58,7 @@ function computeYearlySpendHistory(PDO $pdo, ?string $today = null, ?string $kin
 
     $kindSql = $kind !== null ? ' AND s.kind = ?' : '';
     $kindArgs = $kind !== null ? [$kind] : [];
-    $minStmt = $pdo->prepare('SELECT MIN(substr(p.payment_date,1,4)) FROM subscription_payments p JOIN subscriptions s ON s.id = p.subscription_id WHERE 1=1' . $kindSql);
+    $minStmt = $pdo->prepare('SELECT MIN(substr(p.payment_date,1,4)) FROM (SELECT subscription_id, payment_date, amount FROM subscription_payments UNION ALL SELECT subscription_id, paid_on, amount FROM subscription_prepayments) p JOIN subscriptions s ON s.id = p.subscription_id WHERE 1=1' . $kindSql);
     $minStmt->execute($kindArgs);
     $minYearRow = $minStmt->fetchColumn();
     $minYear = $minYearRow ? (int) $minYearRow : $currentYear;
@@ -68,7 +68,7 @@ function computeYearlySpendHistory(PDO $pdo, ?string $today = null, ?string $kin
         $buckets[(string) $y] = 0.0;
     }
 
-    $stmt = $pdo->prepare('SELECT substr(p.payment_date,1,4) AS y, SUM(p.amount) AS total FROM subscription_payments p JOIN subscriptions s ON s.id = p.subscription_id WHERE 1=1' . $kindSql . ' GROUP BY y');
+    $stmt = $pdo->prepare('SELECT substr(p.payment_date,1,4) AS y, SUM(p.amount) AS total FROM (SELECT subscription_id, payment_date, amount FROM subscription_payments UNION ALL SELECT subscription_id, paid_on, amount FROM subscription_prepayments) p JOIN subscriptions s ON s.id = p.subscription_id WHERE 1=1' . $kindSql . ' GROUP BY y');
     $stmt->execute($kindArgs);
     foreach ($stmt->fetchAll() as $row) {
         if (isset($buckets[$row['y']])) {

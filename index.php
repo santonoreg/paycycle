@@ -301,9 +301,12 @@ if ($expiring): ?>
         }
         $freezesJson = htmlspecialchars(json_encode($d['freezes']), ENT_QUOTES);
         $activityJson = htmlspecialchars(json_encode($activityBySub[(int) $sub['id']] ?? [], JSON_UNESCAPED_UNICODE), ENT_QUOTES);
-        $paymentsJson = htmlspecialchars(json_encode(array_map(fn($p) => [
+        $paymentsJson = htmlspecialchars(json_encode(array_merge(array_map(fn($p) => [
             'amount' => (float) $p['amount'], 'payment_date' => $p['payment_date'], 'is_estimate' => (int) $p['is_estimate'],
-        ], $d['payments'])), ENT_QUOTES);
+        ], $d['payments']), array_map(fn($pp) => [
+            // εξόφληση: μία γραμμή για όλες τις δόσεις που εξοφλήθηκαν νωρίτερα
+            'amount' => (float) $pp['amount'], 'payment_date' => $pp['paid_on'], 'is_estimate' => 0, 'prepaid' => (int) $pp['installments'],
+        ], $d['prepayments']))), ENT_QUOTES);
       ?>
         <tr class="<?= $rowClass ?><?= $fGroup !== '' ? ' group-child d-none' : '' ?>"<?= $fGroup !== '' ? ' data-group="g' . $gIndex . '"' : '' ?>>
           <td>
@@ -375,6 +378,12 @@ if ($expiring): ?>
                   <i class="bi bi-<?= $loggedIn ? 'pencil-square' : 'info-circle' ?> me-2"></i><?= $loggedIn ? te('menu.details_edit') : te('title.details') ?></button></li>
                 <?php if ($loggedIn): ?>
                 <li><button type="button" class="dropdown-item js-duplicate"><i class="bi bi-copy me-2"></i><?= te('menu.duplicate') ?></button></li>
+                <?php if ($stats['installments_total'] !== null && ($stats['installments_remaining'] ?? 0) > 0 && in_array($sub['status'], ['active', 'trial', 'frozen'], true)): ?>
+                <li><button type="button" class="dropdown-item js-prepay"
+                  data-id="<?= $sub['id'] ?>" data-name="<?= htmlspecialchars($sub['name']) ?>"
+                  data-remaining="<?= (int) $stats['installments_remaining'] ?>"
+                  data-unit="<?= number_format((float) ($stats['next_payment_amount'] ?? $stats['current_price']), 2, '.', '') ?>"><i class="bi bi-cash-coin me-2"></i><?= te('menu.prepay') ?></button></li>
+                <?php endif; ?>
                 <li><hr class="dropdown-divider"></li>
                   <?php if (in_array($sub['status'], ['active', 'trial'], true)): ?>
                     <li>
@@ -513,6 +522,54 @@ if ($expiring): ?>
         <div class="modal-footer">
           <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal"><?= te('common.cancel') ?></button>
           <button type="submit" class="btn btn-primary"><?= te('common.save') ?></button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+<?php endif; ?>
+
+<?php if ($loggedIn): ?>
+<!-- ===================== Modal: Εξόφληση δόσεων ===================== -->
+<div class="modal fade" id="prepayModal" tabindex="-1">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <form method="post" action="actions/prepay.php" id="prepayForm">
+        <?= csrfField() ?>
+        <input type="hidden" name="id" id="prepay-id">
+        <div class="modal-header">
+          <h5 class="modal-title"><i class="bi bi-cash-coin"></i> <?= te('prepay.title') ?> — <span id="prepay-name"></span></h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+        </div>
+        <div class="modal-body">
+          <p class="mb-3" id="prepay-remaining"></p>
+          <div class="form-check mb-2">
+            <input class="form-check-input" type="radio" name="mode" id="prepay-mode-full" value="full" checked>
+            <label class="form-check-label" for="prepay-mode-full" id="prepay-full-label"></label>
+          </div>
+          <div class="form-check mb-2">
+            <input class="form-check-input" type="radio" name="mode" id="prepay-mode-count" value="count">
+            <label class="form-check-label" for="prepay-mode-count"><?= te('prepay.partial') ?></label>
+          </div>
+          <div class="mb-3 ms-4" style="max-width: 10rem;">
+            <input type="number" min="1" step="1" name="installments" id="prepay-count" class="form-control form-control-sm" value="1" disabled aria-label="<?= te('prepay.count') ?>">
+          </div>
+          <div class="row">
+            <div class="col-6 mb-3">
+              <label class="form-label" for="prepay-amount"><?= te('prepay.amount') ?></label>
+              <input type="number" step="0.01" min="0" name="amount" id="prepay-amount" class="form-control" required>
+            </div>
+            <div class="col-6 mb-3">
+              <label class="form-label" for="prepay-date"><?= te('prepay.date') ?></label>
+              <input type="date" name="paid_on" id="prepay-date" class="form-control" value="<?= $today ?>" max="<?= $today ?>" required>
+            </div>
+          </div>
+          <div class="form-text"><?= te('prepay.amount_help') ?></div>
+          <div class="alert alert-info py-2 small mt-3 mb-0"><i class="bi bi-info-circle"></i> <?= te('prepay.help') ?></div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal"><?= te('common.cancel') ?></button>
+          <button type="submit" class="btn btn-primary"><?= te('prepay.submit') ?></button>
         </div>
       </form>
     </div>

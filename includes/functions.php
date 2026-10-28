@@ -152,6 +152,18 @@ function estimateFromPayments(array $payments, array $prices, string $date): flo
     return round($sum / count($last), 2);
 }
 
+/**
+ * Πόσες δόσεις έχουν εξοφληθεί νωρίτερα (εξόφληση). Είναι οι ΤΕΛΕΥΤΑΙΕΣ δόσεις του
+ * πλάνου: το πλήθος των προγραμματισμένων δόσεων μειώνεται, ενώ οι ημερομηνίες
+ * των υπόλοιπων δόσεων μένουν ως έχουν.
+ */
+function prepaidInstallments(PDO $pdo, int $subId): int
+{
+    $stmt = $pdo->prepare('SELECT COALESCE(SUM(installments), 0) FROM subscription_prepayments WHERE subscription_id = ?');
+    $stmt->execute([$subId]);
+    return (int) $stmt->fetchColumn();
+}
+
 /** Ξαναϋπολογίζει τα ποσά των πληρωμών που είναι ακόμα εκτιμήσεις (μετά από επιβεβαίωση λογαριασμού ή αλλαγή τιμής). */
 function refreshEstimates(PDO $pdo, int $subId): void
 {
@@ -237,7 +249,7 @@ function syncSubscriptionLedger(PDO $pdo, array $sub, array $prices, array $free
  */
 function reconcileInstallmentStatus(PDO $pdo, int $subId): void
 {
-    $count = '(SELECT COUNT(*) FROM subscription_payments WHERE subscription_id = subscriptions.id)';
+    $count = '((SELECT COUNT(*) FROM subscription_payments WHERE subscription_id = subscriptions.id) + (SELECT COALESCE(SUM(installments), 0) FROM subscription_prepayments WHERE subscription_id = subscriptions.id))';
     $pdo->prepare("UPDATE subscriptions SET status='paid_off', updated_at=datetime('now')
                    WHERE id = ? AND status IN ('active','trial') AND total_installments IS NOT NULL AND $count >= total_installments")
         ->execute([$subId]);
@@ -260,7 +272,8 @@ function syncSubscriptionLedgerRows(PDO $pdo, array $sub, array $prices, array $
         $cp->execute([$sub['id']]);
         $confirmedPayments = $cp->fetchAll();
     }
-    $totalInstallments = $totalInstallments !== null ? (int) $totalInstallments : null;
+    // Οι δόσεις που εξοφλήθηκαν νωρίτερα δεν προγραμματίζονται πια (αφαιρούνται από το τέλος του πλάνου).
+    $totalInstallments = $totalInstallments !== null ? max(0, (int) $totalInstallments - prepaidInstallments($pdo, (int) $sub['id'])) : null;
     $recorded = (int) $recorded;
     $interval = new DateInterval(frequencyIntervalSpec($frequency));
 
@@ -389,17 +402,26 @@ function reactivateSubscription(PDO $pdo, array $sub, string $today, bool $clear
  * @param array $payments καταχωρημένες πληρωμές (ταξινομημένες αύξοντα κατά payment_date)
  * @param string|null $today override για tests (default: σήμερα)
  */
-function computeSubscriptionStats(array $sub, array $prices, array $freezes, array $payments, ?string $today = null): array
+function computeSubscriptionStats(array $sub, array $prices, array $freezes, array $payments, ?string $today = null, array $prepayments = []): array
 {
     $today = $today ?? date('Y-m-d');
     $frequency = $sub['frequency'];
 
-    $installmentsPaid = count($payments);
-    $totalPaid = 0.0;
+    // Δόσεις: οι προγραμματισμένες (βιβλίο πληρωμών) + όσες εξοφλήθηκαν νωρίτερα (εξόφληση).
+    $scheduledCount = count($payments);
+    $prepaidCount = 0;
+    $prepaidTotal = 0.0;
+    foreach ($prepayments as $pp) {
+        $prepaidCount += (int) $pp['installments'];
+        $prepaidTotal += (float) $pp['amount'];
+    }
+    $installmentsPaid = $scheduledCount + $prepaidCount;
+    $totalPaid = $prepaidTotal;
     foreach ($payments as $p) {
         $totalPaid += (float) $p['amount'];
     }
-    $lastPaymentDate = $installmentsPaid > 0 ? $payments[$installmentsPaid - 1]['payment_date'] : null;
+    // Η επόμενη δόση υπολογίζεται από την τελευταία ΠΡΟΓΡΑΜΜΑΤΙΣΜΕΝΗ πληρωμή, όχι από την εξόφληση.
+    $lastPaymentDate = $scheduledCount > 0 ? $payments[$scheduledCount - 1]['payment_date'] : null;
 
     // Επόμενη δόση (μόνο για ενεργές/δοκιμαστικές συνδρομές — όχι παγωμένες/ακυρωμένες).
     $nextPaymentDate = null;
@@ -454,6 +476,8 @@ function computeSubscriptionStats(array $sub, array $prices, array $freezes, arr
         'is_variable'            => $variable,
         'estimates_pending'      => $estimatesPending,
         'installments_total'     => $totalInstallments,
+        'prepaid_installments'   => $prepaidCount,
+        'prepaid_total'          => round($prepaidTotal, 2),
         'installments_remaining' => $totalInstallments !== null ? max(0, $totalInstallments - $installmentsPaid) : null,
     ];
 }
@@ -511,6 +535,7 @@ function getAllSubscriptionsWithDetails(PDO $pdo, ?string $today = null, ?string
     $pricesStmt = $pdo->prepare('SELECT id, cost, effective_from FROM subscription_prices WHERE subscription_id = ? ORDER BY effective_from ASC, id ASC');
     $freezesStmt = $pdo->prepare('SELECT frozen_from, frozen_until FROM subscription_freezes WHERE subscription_id = ? ORDER BY frozen_from ASC');
     $paymentsStmt = $pdo->prepare('SELECT payment_date, amount, is_estimate FROM subscription_payments WHERE subscription_id = ? ORDER BY payment_date ASC');
+    $prepaymentsStmt = $pdo->prepare('SELECT id, paid_on, installments, amount FROM subscription_prepayments WHERE subscription_id = ? ORDER BY paid_on ASC, id ASC');
 
     $result = [];
     foreach ($subs as $sub) {
@@ -523,7 +548,10 @@ function getAllSubscriptionsWithDetails(PDO $pdo, ?string $today = null, ?string
         $paymentsStmt->execute([$sub['id']]);
         $payments = $paymentsStmt->fetchAll();
 
-        $stats = computeSubscriptionStats($sub, $prices, $freezes, $payments, $today);
+        $prepaymentsStmt->execute([$sub['id']]);
+        $prepayments = $prepaymentsStmt->fetchAll();
+
+        $stats = computeSubscriptionStats($sub, $prices, $freezes, $payments, $today, $prepayments);
         foreach ($prices as $i => $_) {
             $prices[$i]['deletable'] = count($prices) > 1 && !priceIsUsedByPayments($prices, $i, $payments);
         }
@@ -533,6 +561,7 @@ function getAllSubscriptionsWithDetails(PDO $pdo, ?string $today = null, ?string
             'prices'   => $prices,
             'freezes'  => $freezes,
             'payments' => $payments,
+            'prepayments' => $prepayments,
             'stats'    => $stats,
         ];
     }
@@ -637,7 +666,7 @@ function getDistinctPaymentMethods(PDO $pdo): array
  * Καταγράφει ποιος έκανε τι σε μια συνδρομή. Δεν πετά ποτέ exception: αν η
  * καταγραφή αποτύχει, η ίδια η ενέργεια δεν πρέπει να χαλάσει.
  *
- * @param string $action created|edited|price_added|price_deleted|payment_confirmed|frozen|unfrozen|canceled|reactivated|expired|deleted
+ * @param string $action created|edited|price_added|price_deleted|payment_confirmed|frozen|unfrozen|canceled|reactivated|expired|prepaid|deleted
  */
 function logActivity(PDO $pdo, int $subId, string $subName, string $action, array $details = [], bool $system = false): void
 {
@@ -674,6 +703,8 @@ function activityText(string $action, array $details): string
         case 'reactivated':
         case 'deleted':
             return t('activity.' . $action);
+        case 'prepaid':
+            return t(!empty($details['full']) ? 'activity.prepaid_full' : 'activity.prepaid', ['n' => (int) ($details['installments'] ?? 0), 'amount' => euro((float) ($details['amount'] ?? 0)), 'date' => fdate($details['date'] ?? null)]);
         case 'expired':
             return t('activity.expired', ['date' => fdate($details['end_date'] ?? null)]);
     }

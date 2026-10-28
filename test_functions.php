@@ -129,4 +129,42 @@ check('getAllSubscriptionsWithDetails: one subscription', count($all), 1);
 check('getAllSubscriptionsWithDetails: auto-synced installments', $all[0]['stats']['installments_paid'], 4); // Jun,Jul,Aug,Sep
 check('getAllSubscriptionsWithDetails: next payment', $all[0]['stats']['next_payment_date'], '2026-10-09');
 
+
+// --- Εξόφληση δόσεων (prepayments) -------------------------------------------
+// Πλάνο 6 μηνιαίων δόσεων από 2026-06-10. Στις 2026-08-20 έχουν πέσει 3 (Ιούν, Ιούλ, Αύγ).
+// Εξοφλούμε 2 δόσεις νωρίτερα: μένει 1 προγραμματισμένη (10/9), οι ημερομηνίες δεν αλλάζουν.
+$pdoP = freshTestDb();
+$subIdP = insertSub($pdoP, ['name' => 'Prepay', 'frequency' => 'monthly', 'start_date' => '2026-06-10']);
+$pdoP->exec("UPDATE subscriptions SET kind='recurring', total_installments=6 WHERE id=$subIdP");
+insertPrice($pdoP, $subIdP, 50.0, '2026-06-10');
+$allP = getAllSubscriptionsWithDetails($pdoP, '2026-08-20');
+check('Prepay: before - paid', $allP[0]['stats']['installments_paid'], 3);
+check('Prepay: before - next payment', $allP[0]['stats']['next_payment_date'], '2026-09-10');
+check('Prepay: before - remaining', $allP[0]['stats']['installments_remaining'], 3);
+$pdoP->exec("INSERT INTO subscription_prepayments (subscription_id, paid_on, installments, amount) VALUES ($subIdP, '2026-08-20', 2, 95.00)");
+$allP = getAllSubscriptionsWithDetails($pdoP, '2026-08-20');
+check('Prepay: paid counts prepaid installments', $allP[0]['stats']['installments_paid'], 5);
+check('Prepay: remaining', $allP[0]['stats']['installments_remaining'], 1);
+check('Prepay: next payment date unchanged', $allP[0]['stats']['next_payment_date'], '2026-09-10');
+check('Prepay: total paid = 3 x 50 + 95', $allP[0]['stats']['total_paid'], 245.0);
+// Sept 10 arrives: the one remaining installment is recorded and the plan completes; nothing more is scheduled.
+$allP = getAllSubscriptionsWithDetails($pdoP, '2026-12-31');
+check('Prepay: ledger stops at total - prepaid', (int) $pdoP->query("SELECT COUNT(*) FROM subscription_payments WHERE subscription_id=$subIdP")->fetchColumn(), 4);
+check('Prepay: last scheduled date', $pdoP->query("SELECT MAX(payment_date) FROM subscription_payments WHERE subscription_id=$subIdP")->fetchColumn(), '2026-09-10');
+check('Prepay: status completed', $allP[0]['sub']['status'], 'paid_off');
+check('Prepay: no next payment', $allP[0]['stats']['next_payment_date'], null);
+
+// Full payoff right away (nothing scheduled any more) -> completed
+$pdoQ = freshTestDb();
+$subIdQ = insertSub($pdoQ, ['name' => 'FullPayoff', 'frequency' => 'monthly', 'start_date' => '2026-06-10']);
+$pdoQ->exec("UPDATE subscriptions SET kind='recurring', total_installments=6 WHERE id=$subIdQ");
+insertPrice($pdoQ, $subIdQ, 50.0, '2026-06-10');
+getAllSubscriptionsWithDetails($pdoQ, '2026-08-20'); // 3 recorded
+$pdoQ->exec("INSERT INTO subscription_prepayments (subscription_id, paid_on, installments, amount) VALUES ($subIdQ, '2026-08-20', 3, 140.00)");
+reconcileInstallmentStatus($pdoQ, $subIdQ);
+$allQ = getAllSubscriptionsWithDetails($pdoQ, '2027-03-01');
+check('Full payoff: status completed', $allQ[0]['sub']['status'], 'paid_off');
+check('Full payoff: nothing scheduled after', (int) $pdoQ->query("SELECT COUNT(*) FROM subscription_payments WHERE subscription_id=$subIdQ")->fetchColumn(), 3);
+check('Full payoff: installments paid = total', $allQ[0]['stats']['installments_paid'], 6);
+
 echo "\nΌλα τα tests έτρεξαν.\n";

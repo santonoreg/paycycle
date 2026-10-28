@@ -138,6 +138,50 @@ document.addEventListener('DOMContentLoaded', function () {
     });
   });
 
+  // --- Εξόφληση δόσεων: πλήρης ή συγκεκριμένου πλήθους δόσεων ---
+  var prepayModalEl = document.getElementById('prepayModal');
+  var prepayForm = document.getElementById('prepayForm');
+  if (prepayModalEl && prepayForm) {
+    var prepay = { unit: 0, remaining: 0, dirty: false };
+    var countInput = document.getElementById('prepay-count');
+    var amountInput = document.getElementById('prepay-amount');
+    var modeFull = document.getElementById('prepay-mode-full');
+    var modeCount = document.getElementById('prepay-mode-count');
+    function prepayCount() {
+      if (modeFull.checked) return prepay.remaining;
+      var n = parseInt(countInput.value, 10);
+      return isNaN(n) ? 1 : Math.max(1, Math.min(prepay.remaining, n));
+    }
+    function prepayRecalc() {
+      countInput.disabled = modeFull.checked;
+      // Το προτεινόμενο ποσό = δόσεις × ποσό δόσης (μένει ό,τι έγραψε ο χρήστης αν το άλλαξε)
+      if (!prepay.dirty) amountInput.value = (prepay.unit * prepayCount()).toFixed(2);
+    }
+    modeFull.addEventListener('change', prepayRecalc);
+    modeCount.addEventListener('change', function () { prepayRecalc(); countInput.focus(); });
+    countInput.addEventListener('input', prepayRecalc);
+    amountInput.addEventListener('input', function () { prepay.dirty = true; });
+    document.querySelectorAll('.js-prepay').forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        var d = btn.dataset;
+        prepay.unit = parseFloat(d.unit) || 0;
+        prepay.remaining = parseInt(d.remaining, 10) || 1;
+        prepay.dirty = false;
+        document.getElementById('prepay-id').value = d.id;
+        document.getElementById('prepay-name').textContent = d.name;
+        document.getElementById('prepay-remaining').textContent = tpl(I18N.js.prepay_remaining, { n: prepay.remaining });
+        document.getElementById('prepay-full-label').textContent = tpl(I18N.js.prepay_full, { n: prepay.remaining });
+        modeFull.checked = true;
+        countInput.value = 1;
+        countInput.max = prepay.remaining;
+        // Αν απομένει μία δόση, η "συγκεκριμένο πλήθος" δεν έχει νόημα
+        modeCount.disabled = prepay.remaining < 2;
+        prepayRecalc();
+        bootstrap.Modal.getOrCreateInstance(prepayModalEl).show();
+      });
+    });
+  }
+
   // --- Μηνύματα (toast): εμφανίζονται και εξαφανίζονται μόνα τους ---
   document.querySelectorAll('.toast-container .toast').forEach(function (el) {
     bootstrap.Toast.getOrCreateInstance(el).show();
@@ -254,7 +298,8 @@ document.addEventListener('DOMContentLoaded', function () {
       var paymentsTotalEl = document.getElementById('payments-total');
       if (paymentsTotalEl) {
         var total = payments.reduce(function (sum, p) { return sum + Number(p.amount); }, 0);
-        paymentsTotalEl.textContent = tpl(I18N.js.installments_total, { n: payments.length, total: fmtEuro(total) });
+        var installmentCount = payments.reduce(function (n, p) { return n + (p.prepaid ? Number(p.prepaid) : 1); }, 0);
+        paymentsTotalEl.textContent = tpl(I18N.js.installments_total, { n: installmentCount, total: fmtEuro(total) });
       }
       var sortedPayments = payments.slice().sort(function (a, b) { return b.payment_date.localeCompare(a.payment_date); });
       var paymentsList = document.getElementById('payments-list');
@@ -267,6 +312,12 @@ document.addEventListener('DOMContentLoaded', function () {
           // Μεταβλητό ποσό + συνδεδεμένος διαχειριστής: κάθε γραμμή έχει πεδίο για το πραγματικό ποσό του λογαριασμού
           var canEditAmounts = !!payCsrf && d.variable === '1';
           paymentsList.innerHTML = sortedPayments.map(function (p) {
+            if (p.prepaid) {
+              // Εξόφληση: δεν επεξεργάζεται εδώ
+              return '<div class="entry"><strong class="num">' + fmtEuro(p.amount) + '</strong> ' +
+                '<span class="text-muted">' + fmtDate(p.payment_date) + '</span> ' +
+                '<span class="awaiting-badge"><i class="bi bi-cash-coin"></i> ' + escapeHtml(tpl(I18N.js.prepayment, { n: p.prepaid })) + '</span></div>';
+            }
             var badge = p.is_estimate ? ' <span class="awaiting-badge"><i class="bi bi-hourglass-split"></i> ' + escapeHtml(I18N.js.awaiting_bill) + '</span>' : '';
             if (canEditAmounts) {
               return '<div class="entry"><form method="post" action="actions/confirm_payment.php" class="d-flex align-items-center gap-2 flex-wrap">' +

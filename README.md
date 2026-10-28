@@ -191,6 +191,7 @@ Every time a subscription is "charged" (monthly/yearly/etc.), the app
 - **Messages** appear as toasts that disappear after a few seconds.
 - **Theme:** the three buttons next to the language menu switch between light, dark and automatic (follows the device); remembered per browser in a cookie.
 - **Grouping:** the *Group by* selector (User / Card / Payment category / Payment type) puts the rows into groups with a count and the monthly cost of the active ones. Click a group (+) to open it (−); there are also expand/collapse-all buttons. With no grouping selected the list looks as before.
+- **Paying off installments:** for a payment with a number of installments, *Pay off installments…* in the **...** menu records an early payment — either in full (all remaining installments; the payment becomes *Completed*) or a chosen number of installments. The paid installments are removed from the **end** of the plan, so the dates of the remaining installments do not change. You enter the amount you actually paid (default: installments × installment amount) and the date; it counts in the statistics for that month and appears in the *Payments* tab and the *Changes* tab.
 - **Page width:** the switch next to the language menu toggles full width or boxed (max 1500px); it is remembered per browser in a cookie.
 
 ## 6. Languages and Settings

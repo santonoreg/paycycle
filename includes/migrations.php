@@ -112,6 +112,26 @@ function getMigrations(): array
             'own_transaction' => true,
             'up'   => 'migrateEndDateAndExpired',
         ],
+        10 => [
+            'name' => 'subscription_prepayments (early payoff of the last installments)',
+            'up'   => function (PDO $pdo): void {
+                // Μόνο νέος πίνακας — δεν αγγίζει υπάρχουσες εγγραφές. Κάθε γραμμή = εξόφληση των
+                // ΤΕΛΕΥΤΑΙΩΝ $installments δόσεων του πλάνου· οι ημερομηνίες των υπόλοιπων δόσεων δεν αλλάζουν.
+                $pdo->exec("
+                    CREATE TABLE IF NOT EXISTS subscription_prepayments (
+                        id              INTEGER PRIMARY KEY AUTOINCREMENT,
+                        subscription_id INTEGER NOT NULL,
+                        paid_on         TEXT NOT NULL,
+                        installments    INTEGER NOT NULL CHECK(installments >= 1),
+                        amount          REAL NOT NULL,
+                        created_by_name TEXT,
+                        created_at      TEXT NOT NULL DEFAULT (datetime('now')),
+                        FOREIGN KEY(subscription_id) REFERENCES subscriptions(id) ON DELETE CASCADE
+                    )
+                ");
+                $pdo->exec('CREATE INDEX IF NOT EXISTS idx_prepayments_sub ON subscription_prepayments(subscription_id, paid_on)');
+            },
+        ],
         4 => [
             'name' => 'subscriptions.total_installments + status paid_off (table rebuild, data preserved)',
             'own_transaction' => true,

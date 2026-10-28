@@ -44,6 +44,10 @@ if ($setInstallments) {
     }
 }
 
+if ($installments !== null && $id > 0 && $installments < prepaidInstallments(getDb(), $id)) {
+    $errors[] = t('err.installments_below_prepaid', ['n' => prepaidInstallments(getDb(), $id)]);
+}
+
 // Εκτίμηση ποσού (μεταβλητά ποσά): διορθώνει την τρέχουσα τιμή αναφοράς
 $estimate = null;
 if ($setInstallments && !empty($_POST['variable_amount']) && trim($_POST['estimate'] ?? '') !== '') {
