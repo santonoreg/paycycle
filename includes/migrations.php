@@ -153,6 +153,17 @@ function getMigrations(): array
                 }
             },
         ],
+        13 => [
+            'name' => 'subscription_freezes.is_skip (deleted installments are not regenerated)',
+            'up'   => function (PDO $pdo): void {
+                // is_skip=1: μονοήμερο "πάγωμα" που προκύπτει όταν ο χρήστης σβήνει μια δόση, ώστε το βιβλίο
+                // πληρωμών να μην την ξαναδημιουργήσει. Δεν εμφανίζεται στα Παγώματα. Οι υπάρχουσες γραμμές μένουν 0.
+                $cols = array_column($pdo->query('PRAGMA table_info(subscription_freezes)')->fetchAll(), 'name');
+                if (!in_array('is_skip', $cols, true)) {
+                    $pdo->exec('ALTER TABLE subscription_freezes ADD COLUMN is_skip INTEGER NOT NULL DEFAULT 0');
+                }
+            },
+        ],
         4 => [
             'name' => 'subscriptions.total_installments + status paid_off (table rebuild, data preserved)',
             'own_transaction' => true,

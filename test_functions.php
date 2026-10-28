@@ -216,4 +216,24 @@ $m = computeMonthlySpendHistory($pdoE, 6, '2026-10-01', 'recurring');
 check('Early: spend counted in the paid month', $m['2026-08'] ?? null, 300.0);
 check('Early: spend not counted in the slot month', $m['2026-09'] ?? null, 0.0);
 
+
+// --- Διαγραφή δόσης: η δόση δεν ξαναδημιουργείται -------------------------------------
+$pdoD = freshTestDb();
+$subIdD = insertSub($pdoD, ['name' => 'WrongFreq', 'frequency' => 'monthly', 'start_date' => '2026-05-01']);
+insertPrice($pdoD, $subIdD, 100.0, '2026-05-01');
+$allD = getAllSubscriptionsWithDetails($pdoD, '2026-10-05'); // May..Oct = 6
+check('Delete: before', $allD[0]['stats']['installments_paid'], 6);
+// delete the middle one (01/07) and the LAST one (01/10), the way delete_payment.php does
+foreach (['2026-07-01', '2026-10-01'] as $dt) {
+    $pdoD->exec("DELETE FROM subscription_payments WHERE subscription_id=$subIdD AND payment_date='$dt'");
+    $pdoD->exec("INSERT INTO subscription_freezes (subscription_id, frozen_from, frozen_until, is_skip) VALUES ($subIdD, '$dt', '$dt', 1)");
+}
+$allD = getAllSubscriptionsWithDetails($pdoD, '2026-10-06'); // a later page load must not bring them back
+check('Delete: stays deleted after another sync', $allD[0]['stats']['installments_paid'], 4);
+check('Delete: last deleted date not regenerated', (int) $pdoD->query("SELECT COUNT(*) FROM subscription_payments WHERE subscription_id=$subIdD AND payment_date='2026-10-01'")->fetchColumn(), 0);
+check('Delete: next payment skips the deleted slot', $allD[0]['stats']['next_payment_date'], '2026-11-01');
+check('Delete: skip rows are not shown as freezes', count($allD[0]['freezes']), 0);
+$allD = getAllSubscriptionsWithDetails($pdoD, '2026-11-02');
+check('Delete: schedule continues afterwards', $allD[0]['stats']['installments_paid'], 5); // + 01/11
+
 echo "\nΌλα τα tests έτρεξαν.\n";

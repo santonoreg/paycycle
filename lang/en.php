@@ -430,4 +430,11 @@ return [
     'activity.paid_early' => 'Paid the {slot} installment early ({amount}) on {date}',
     'activity.paid_early_edited' => 'Corrected the payment of the {slot} installment: {amount} on {date}',
     'activity.paid_early_removed' => 'Canceled the early payment of the {slot} installment ({amount})',
+
+    // Deleting an installment
+    'js.payment_delete' => 'Delete installment',
+    'js.payment_delete_confirm' => 'Delete the installment of {date}? It will not be recreated automatically.',
+    'msg.payment_deleted' => 'The {date} installment of "{name}" was deleted.',
+    'err.payment_not_found' => 'The installment was not found.',
+    'activity.payment_deleted' => 'Deleted the {date} installment ({amount})',
 ];

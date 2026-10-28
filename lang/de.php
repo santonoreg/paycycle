@@ -419,4 +419,11 @@ return [
     'activity.paid_early' => 'Rate vom {slot} früher bezahlt ({amount}) am {date}',
     'activity.paid_early_edited' => 'Zahlung der Rate vom {slot} korrigiert: {amount} am {date}',
     'activity.paid_early_removed' => 'Frühere Zahlung der Rate vom {slot} storniert ({amount})',
+
+    // Deleting an installment
+    'js.payment_delete' => 'Rate löschen',
+    'js.payment_delete_confirm' => 'Die Rate vom {date} löschen? Sie wird nicht automatisch neu erzeugt.',
+    'msg.payment_deleted' => 'Die Rate vom {date} von „{name}“ wurde gelöscht.',
+    'err.payment_not_found' => 'Die Rate wurde nicht gefunden.',
+    'activity.payment_deleted' => 'Rate vom {date} gelöscht ({amount})',
 ];

@@ -157,6 +157,7 @@ if ($old && $old['status'] !== 'canceled' && ($old['frequency'] !== $frequency |
         $keep->execute([$id, $id]);
         $confirmedRows = $keep->fetchAll();
         $pdo->prepare('DELETE FROM subscription_payments WHERE subscription_id = ?')->execute([$id]);
+        $pdo->prepare('DELETE FROM subscription_freezes WHERE subscription_id = ? AND is_skip = 1')->execute([$id]);
         $pr = $pdo->prepare('SELECT cost, effective_from FROM subscription_prices WHERE subscription_id = ? ORDER BY effective_from ASC, id ASC');
         $pr->execute([$id]);
         $fr = $pdo->prepare('SELECT frozen_from, frozen_until FROM subscription_freezes WHERE subscription_id = ? ORDER BY frozen_from ASC');

@@ -430,4 +430,11 @@ return [
     'activity.paid_early' => 'Πληρωμή νωρίτερα της δόσης {slot} ({amount}) στις {date}',
     'activity.paid_early_edited' => 'Διόρθωση πληρωμής της δόσης {slot}: {amount} στις {date}',
     'activity.paid_early_removed' => 'Ακύρωση πληρωμής νωρίτερα της δόσης {slot} ({amount})',
+
+    // Deleting an installment
+    'js.payment_delete' => 'Διαγραφή δόσης',
+    'js.payment_delete_confirm' => 'Διαγραφή της δόσης {date}; Δεν θα ξαναδημιουργηθεί αυτόματα.',
+    'msg.payment_deleted' => 'Η δόση {date} της «{name}» διαγράφηκε.',
+    'err.payment_not_found' => 'Η δόση δεν βρέθηκε.',
+    'activity.payment_deleted' => 'Διαγραφή δόσης {date} ({amount})',
 ];

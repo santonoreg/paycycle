@@ -326,6 +326,19 @@ document.addEventListener('DOMContentLoaded', function () {
           var payBack = document.querySelector('#editPriceForm [name="back"]');
           // Μεταβλητό ποσό + συνδεδεμένος διαχειριστής: κάθε γραμμή έχει πεδίο για το πραγματικό ποσό του λογαριασμού
           var canEditAmounts = !!payCsrf && d.variable === '1';
+          // Κουμπί διαγραφής δόσης (μόνο για συνδεδεμένο χρήστη)
+          function deleteConfirm(p) {
+            return 'return confirm(' + escapeHtml(JSON.stringify(tpl(I18N.js.payment_delete_confirm, { date: fmtDate(p.payment_date) }))) + ');';
+          }
+          function deletePaymentForm(p) {
+            if (!payCsrf) return '';
+            return '<form method="post" action="actions/delete_payment.php" class="ms-auto" onsubmit="' + deleteConfirm(p) + '">' +
+              '<input type="hidden" name="csrf_token" value="' + escapeHtml(payCsrf.value) + '">' +
+              (payBack ? '<input type="hidden" name="back" value="' + escapeHtml(payBack.value) + '">' : '') +
+              '<input type="hidden" name="id" value="' + escapeHtml(d.id) + '">' +
+              '<input type="hidden" name="payment_date" value="' + escapeHtml(p.payment_date) + '">' +
+              '<button type="submit" class="btn btn-sm btn-outline-danger py-0 px-2" title="' + escapeHtml(I18N.js.payment_delete) + '"><i class="bi bi-trash"></i></button></form>';
+          }
           paymentsList.innerHTML = sortedPayments.map(function (p) {
             if (p.early_open && payCsrf) {
               // Δόση που πληρώθηκε νωρίτερα (η ημερομηνία της δεν έχει φτάσει): διορθώνεται ή ακυρώνεται
@@ -374,11 +387,12 @@ document.addEventListener('DOMContentLoaded', function () {
                 '<span class="text-muted">' + fmtDate(p.payment_date) + '</span>' + badge +
                 '<span class="ms-auto d-flex gap-1"><input type="number" step="0.01" min="0" name="amount" value="' + Number(p.amount).toFixed(2) + '" required ' +
                 'class="form-control form-control-sm num' + (p.is_estimate ? ' estimate-input' : '') + '" style="width:110px">' +
-                '<button type="submit" class="btn btn-sm btn-outline-primary py-0 px-2" title="' + escapeHtml(I18N.js.save_amount) + '"><i class="bi bi-check-lg"></i></button></span>' +
+                '<button type="submit" class="btn btn-sm btn-outline-primary py-0 px-2" title="' + escapeHtml(I18N.js.save_amount) + '"><i class="bi bi-check-lg"></i></button>' +
+                '<button type="submit" formaction="actions/delete_payment.php" formnovalidate class="btn btn-sm btn-outline-danger py-0 px-2" title="' + escapeHtml(I18N.js.payment_delete) + '" onclick="' + deleteConfirm(p) + '"><i class="bi bi-trash"></i></button></span>' +
                 '</form></div>';
             }
-            return '<div class="entry"><strong class="num">' + (p.is_estimate ? '≈ ' : '') + fmtEuro(p.amount) + '</strong> ' +
-              '<span class="text-muted">' + fmtDate(p.payment_date) + '</span>' + badge + '</div>';
+            return '<div class="entry d-flex align-items-center gap-2 flex-wrap"><div><strong class="num">' + (p.is_estimate ? '≈ ' : '') + fmtEuro(p.amount) + '</strong> ' +
+              '<span class="text-muted">' + fmtDate(p.payment_date) + '</span>' + badge + '</div>' + deletePaymentForm(p) + '</div>';
           }).join('');
         }
       }
