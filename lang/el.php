@@ -397,4 +397,12 @@ return [
     'err.installments_below_prepaid' => 'Το πλήθος δόσεων δεν μπορεί να είναι μικρότερο από τις {n} δόσεις που έχουν εξοφληθεί.',
     'activity.prepaid' => 'Εξόφληση {n} δόσεων ({amount}) στις {date}',
     'activity.prepaid_full' => 'Πλήρης εξόφληση ({n} δόσεις, {amount}) στις {date}',
+
+    // Prepayment corrections
+    'js.prepay_delete' => 'Ακύρωση εξόφλησης',
+    'js.prepay_delete_confirm' => 'Ακύρωση αυτής της εξόφλησης; Οι δόσεις θα ξαναμπούν στο πρόγραμμα πληρωμών.',
+    'msg.prepay_updated' => 'Η εξόφληση της «{name}» διορθώθηκε.',
+    'msg.prepay_removed' => 'Η εξόφληση της «{name}» ακυρώθηκε. Οι δόσεις ξαναμπήκαν στο πρόγραμμα.',
+    'activity.prepaid_edited' => 'Διόρθωση εξόφλησης: {n} δόσεις ({amount}) στις {date}',
+    'activity.prepaid_removed' => 'Ακύρωση εξόφλησης ({n} δόσεις, {amount} στις {date})',
 ];

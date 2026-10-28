@@ -9,8 +9,8 @@ window.I18N = <?= json_encode([
     'freq'       => frequencies(),
     'status'     => statuses(),
     'js'         => array_combine(
-        ['installments_total', 'no_payments', 'no_prices', 'from', 'delete_price', 'no_freezes', 'until_today', 'confirm_delete_price', 'awaiting_bill', 'save_amount', 'no_activity', 'dup_title', 'dup_hint', 'new_title', 'legacy_method', 'prepayment', 'prepay_full', 'prepay_remaining'],
-        [t('js.installments_total'), t('js.no_payments'), t('js.no_prices'), t('js.from'), t('js.delete_price'), t('js.no_freezes'), t('js.until_today'), t('confirm.delete_price'), t('var.badge'), t('var.save_amount'), t('js.no_activity'), t('js.dup_title'), t('js.dup_hint'), t('modal.new_sub'), t('js.legacy_method'), t('js.prepayment'), t('prepay.full'), t('prepay.remaining')]
+        ['installments_total', 'no_payments', 'no_prices', 'from', 'delete_price', 'no_freezes', 'until_today', 'confirm_delete_price', 'awaiting_bill', 'save_amount', 'no_activity', 'dup_title', 'dup_hint', 'new_title', 'legacy_method', 'prepayment', 'prepay_full', 'prepay_remaining', 'prepay_label', 'prepay_count', 'prepay_save', 'prepay_delete', 'prepay_delete_confirm'],
+        [t('js.installments_total'), t('js.no_payments'), t('js.no_prices'), t('js.from'), t('js.delete_price'), t('js.no_freezes'), t('js.until_today'), t('confirm.delete_price'), t('var.badge'), t('var.save_amount'), t('js.no_activity'), t('js.dup_title'), t('js.dup_hint'), t('modal.new_sub'), t('js.legacy_method'), t('js.prepayment'), t('prepay.full'), t('prepay.remaining'), t('prepay.title'), t('prepay.count'), t('common.save'), t('js.prepay_delete'), t('js.prepay_delete_confirm')]
     ),
 ], JSON_UNESCAPED_UNICODE | JSON_HEX_TAG) ?>;
 </script>

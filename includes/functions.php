@@ -666,7 +666,7 @@ function getDistinctPaymentMethods(PDO $pdo): array
  * Καταγράφει ποιος έκανε τι σε μια συνδρομή. Δεν πετά ποτέ exception: αν η
  * καταγραφή αποτύχει, η ίδια η ενέργεια δεν πρέπει να χαλάσει.
  *
- * @param string $action created|edited|price_added|price_deleted|payment_confirmed|frozen|unfrozen|canceled|reactivated|expired|prepaid|deleted
+ * @param string $action created|edited|price_added|price_deleted|payment_confirmed|frozen|unfrozen|canceled|reactivated|expired|prepaid|prepaid_edited|prepaid_removed|deleted
  */
 function logActivity(PDO $pdo, int $subId, string $subName, string $action, array $details = [], bool $system = false): void
 {
@@ -705,6 +705,9 @@ function activityText(string $action, array $details): string
             return t('activity.' . $action);
         case 'prepaid':
             return t(!empty($details['full']) ? 'activity.prepaid_full' : 'activity.prepaid', ['n' => (int) ($details['installments'] ?? 0), 'amount' => euro((float) ($details['amount'] ?? 0)), 'date' => fdate($details['date'] ?? null)]);
+        case 'prepaid_edited':
+        case 'prepaid_removed':
+            return t('activity.' . $action, ['n' => (int) ($details['installments'] ?? 0), 'amount' => euro((float) ($details['amount'] ?? 0)), 'date' => fdate($details['date'] ?? null)]);
         case 'expired':
             return t('activity.expired', ['date' => fdate($details['end_date'] ?? null)]);
     }

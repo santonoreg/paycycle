@@ -397,4 +397,12 @@ return [
     'err.installments_below_prepaid' => 'The number of installments cannot be lower than the {n} installments already paid off.',
     'activity.prepaid' => 'Paid off {n} installments ({amount}) on {date}',
     'activity.prepaid_full' => 'Paid off in full ({n} installments, {amount}) on {date}',
+
+    // Prepayment corrections
+    'js.prepay_delete' => 'Cancel the payoff',
+    'js.prepay_delete_confirm' => 'Cancel this payoff? The installments go back into the payment schedule.',
+    'msg.prepay_updated' => 'The payoff of "{name}" was corrected.',
+    'msg.prepay_removed' => 'The payoff of "{name}" was canceled. The installments are back in the schedule.',
+    'activity.prepaid_edited' => 'Corrected the payoff: {n} installments ({amount}) on {date}',
+    'activity.prepaid_removed' => 'Canceled the payoff ({n} installments, {amount} on {date})',
 ];

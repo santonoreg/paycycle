@@ -306,6 +306,7 @@ if ($expiring): ?>
         ], $d['payments']), array_map(fn($pp) => [
             // εξόφληση: μία γραμμή για όλες τις δόσεις που εξοφλήθηκαν νωρίτερα
             'amount' => (float) $pp['amount'], 'payment_date' => $pp['paid_on'], 'is_estimate' => 0, 'prepaid' => (int) $pp['installments'],
+            'prepay_id' => (int) $pp['id'], 'prepay_max' => (int) ($d['stats']['installments_remaining'] ?? 0) + (int) $pp['installments'], 'prepay_min_date' => $sub['start_date'],
         ], $d['prepayments']))), ENT_QUOTES);
       ?>
         <tr class="<?= $rowClass ?><?= $fGroup !== '' ? ' group-child d-none' : '' ?>"<?= $fGroup !== '' ? ' data-group="g' . $gIndex . '"' : '' ?>>

@@ -312,8 +312,22 @@ document.addEventListener('DOMContentLoaded', function () {
           // Μεταβλητό ποσό + συνδεδεμένος διαχειριστής: κάθε γραμμή έχει πεδίο για το πραγματικό ποσό του λογαριασμού
           var canEditAmounts = !!payCsrf && d.variable === '1';
           paymentsList.innerHTML = sortedPayments.map(function (p) {
+            if (p.prepaid && payCsrf) {
+              // Εξόφληση: διορθώνεται (πλήθος, ποσό, ημερομηνία) ή ακυρώνεται
+              return '<div class="entry"><form method="post" action="actions/edit_prepayment.php" class="d-flex align-items-center gap-2 flex-wrap">' +
+                '<input type="hidden" name="csrf_token" value="' + escapeHtml(payCsrf.value) + '">' +
+                (payBack ? '<input type="hidden" name="back" value="' + escapeHtml(payBack.value) + '">' : '') +
+                '<input type="hidden" name="id" value="' + escapeHtml(p.prepay_id) + '">' +
+                '<span class="awaiting-badge"><i class="bi bi-cash-coin"></i> ' + escapeHtml(I18N.js.prepay_label) + '</span>' +
+                '<input type="number" min="1" max="' + escapeHtml(p.prepay_max) + '" step="1" name="installments" value="' + escapeHtml(p.prepaid) + '" required class="form-control form-control-sm num" style="width:70px" title="' + escapeHtml(I18N.js.prepay_count) + '">' +
+                '<input type="number" step="0.01" min="0" name="amount" value="' + Number(p.amount).toFixed(2) + '" required class="form-control form-control-sm num" style="width:100px">' +
+                '<input type="date" name="paid_on" value="' + escapeHtml(p.payment_date) + '" min="' + escapeHtml(p.prepay_min_date) + '" required class="form-control form-control-sm" style="width:140px">' +
+                '<span class="ms-auto d-flex gap-1">' +
+                '<button type="submit" class="btn btn-sm btn-outline-primary py-0 px-2" title="' + escapeHtml(I18N.js.prepay_save) + '"><i class="bi bi-check-lg"></i></button>' +
+                '<button type="submit" formaction="actions/delete_prepayment.php" formnovalidate class="btn btn-sm btn-outline-danger py-0 px-2" title="' + escapeHtml(I18N.js.prepay_delete) + '" onclick="return confirm(' + escapeHtml(JSON.stringify(I18N.js.prepay_delete_confirm)) + ');"><i class="bi bi-trash"></i></button></span>' +
+                '</form></div>';
+            }
             if (p.prepaid) {
-              // Εξόφληση: δεν επεξεργάζεται εδώ
               return '<div class="entry"><strong class="num">' + fmtEuro(p.amount) + '</strong> ' +
                 '<span class="text-muted">' + fmtDate(p.payment_date) + '</span> ' +
                 '<span class="awaiting-badge"><i class="bi bi-cash-coin"></i> ' + escapeHtml(tpl(I18N.js.prepayment, { n: p.prepaid })) + '</span></div>';

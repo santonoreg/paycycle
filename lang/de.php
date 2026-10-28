@@ -386,4 +386,12 @@ return [
     'err.installments_below_prepaid' => 'Die Anzahl der Raten darf nicht kleiner sein als die {n} bereits vorzeitig bezahlten Raten.',
     'activity.prepaid' => '{n} Raten vorzeitig bezahlt ({amount}) am {date}',
     'activity.prepaid_full' => 'Vollständig bezahlt ({n} Raten, {amount}) am {date}',
+
+    // Prepayment corrections
+    'js.prepay_delete' => 'Vorzeitige Zahlung stornieren',
+    'js.prepay_delete_confirm' => 'Diese vorzeitige Zahlung stornieren? Die Raten kommen zurück in den Zahlungsplan.',
+    'msg.prepay_updated' => 'Die vorzeitige Zahlung für „{name}“ wurde korrigiert.',
+    'msg.prepay_removed' => 'Die vorzeitige Zahlung für „{name}“ wurde storniert. Die Raten sind wieder im Plan.',
+    'activity.prepaid_edited' => 'Vorzeitige Zahlung korrigiert: {n} Raten ({amount}) am {date}',
+    'activity.prepaid_removed' => 'Vorzeitige Zahlung storniert ({n} Raten, {amount} am {date})',
 ];
